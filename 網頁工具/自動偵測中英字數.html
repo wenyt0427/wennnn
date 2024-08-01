@@ -1,0 +1,347 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>文字統計與網址縮短工具</title>
+    <script src="https://cdn.jsdelivr.net/npm/qrcode-generator@1.4.4/qrcode.min.js"></script>
+    <style>
+        :root {
+            --primary-color: #3498db;
+            --secondary-color: #2ecc71;
+            --text-color: #34495e;
+            --spacing: 20px;
+        }
+        body {
+            font-family: 'Arial', sans-serif;
+            line-height: 1.6;
+            color: var(--text-color);
+            margin: 0;
+            padding: 10px;
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            background-color: #f0f0f0;
+        }
+        .container {
+            background-color: white;
+            border-radius: 15px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+            width: 100%;
+            max-width: 800px;
+            overflow: hidden;
+        }
+        .content {
+            background-image: url('https://tinyurl.com/329d5wa6');
+            background-size: cover;
+            background-position: center;
+            padding: 15px;
+        }
+        .panel {
+            background-color: rgba(255, 255, 255, 0.9);
+            border-radius: 15px;
+            padding: 15px;
+            backdrop-filter: blur(5px);
+        }
+        h1 {
+            color: var(--primary-color);
+            text-align: center;
+            font-size: 2em;
+            margin-bottom: 20px;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.1);
+        }
+        textarea, input[type="text"] {
+            width: 100%;
+            padding: 10px;
+            margin-bottom: 15px;
+            border: 2px solid var(--primary-color);
+            border-radius: 10px;
+            font-size: 16px;
+            resize: vertical;
+            transition: all 0.3s ease;
+            background-color: rgba(255, 255, 255, 0.8);
+            box-sizing: border-box;
+        }
+        textarea {
+            height: 150px;
+        }
+        textarea:focus, input[type="text"]:focus {
+            outline: none;
+            box-shadow: 0 0 10px rgba(52, 152, 219, 0.5);
+        }
+        .result {
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: space-between;
+            margin-top: 15px;
+            margin-bottom: 15px;
+        }
+        .result-box {
+            flex: 0 0 calc(33.33% - 10px);
+            background-color: rgba(255, 255, 255, 0.8);
+            padding: 10px;
+            border-radius: 10px;
+            text-align: center;
+            margin-bottom: 10px;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+            transition: all 0.3s ease;
+        }
+        .result-box h3 {
+            margin-top: 0;
+            color: var(--primary-color);
+            font-size: 0.9em;
+        }
+        .result-box p {
+            font-size: 1.2em;
+            font-weight: bold;
+            color: var(--secondary-color);
+            margin: 5px 0 0;
+        }
+        .url-shortener {
+            margin-top: 15px;
+        }
+        .url-result {
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: space-between;
+            align-items: flex-start;
+            margin-top: 15px;
+        }
+        .url-result-left {
+            width: 100%;
+        }
+        .url-result-right {
+            width: 100%;
+            margin-top: 15px;
+        }
+        #shortUrl {
+            margin-bottom: 15px;
+        }
+        .button-group {
+            display: flex;
+            justify-content: space-between;
+            width: 100%;
+        }
+        button {
+            background-color: var(--primary-color);
+            color: white;
+            border: none;
+            padding: 10px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 14px;
+            transition: background-color 0.3s ease;
+            width: calc(50% - 5px);
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+        button:hover {
+            background-color: #2980b9;
+        }
+        #qrcode {
+            width: 100%;
+            height: auto;
+            margin-top: 15px;
+            cursor: pointer;
+        }
+        #qrcode img {
+            width: 100%;
+            height: auto;
+        }
+        .modal {
+            display: none;
+            position: fixed;
+            z-index: 1;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            overflow: auto;
+            background-color: rgba(0,0,0,0.9);
+        }
+        .modal-content {
+            margin: auto;
+            display: block;
+            width: 80%;
+            max-width: 700px;
+        }
+        .close {
+            position: absolute;
+            top: 15px;
+            right: 35px;
+            color: #f1f1f1;
+            font-size: 40px;
+            font-weight: bold;
+            transition: 0.3s;
+        }
+        .close:hover,
+        .close:focus {
+            color: #bbb;
+            text-decoration: none;
+            cursor: pointer;
+        }
+
+        @media (min-width: 768px) {
+            body {
+                padding: 20px;
+            }
+            .content {
+                padding: 30px;
+            }
+            .panel {
+                padding: 30px;
+            }
+            h1 {
+                font-size: 2.5em;
+            }
+            .result-box {
+                flex: 1;
+                margin: 0 5px;
+            }
+            .url-result-left {
+                width: calc(100% - 170px);
+            }
+            .url-result-right {
+                width: 150px;
+                margin-top: 0;
+                margin-left: 20px;
+            }
+            #qrcode {
+                width: 150px;
+                height: 150px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="content">
+            <div class="panel">
+                <h1>文字統計與網址縮短工具</h1>
+                <textarea id="inputText" placeholder="請在此輸入文字..." oninput="countCharacters()"></textarea>
+                <div class="result">
+                    <div class="result-box">
+                        <h3>中文字數</h3>
+                        <p id="chineseCount">0</p>
+                    </div>
+                    <div class="result-box">
+                        <h3>英文字數</h3>
+                        <p id="englishCount">0</p>
+                    </div>
+                    <div class="result-box">
+                        <h3>標點符號數</h3>
+                        <p id="punctuationCount">0</p>
+                    </div>
+                </div>
+                <div class="url-shortener">
+                    <input type="text" id="longUrl" placeholder="請輸入要縮短的網址">
+                    <div class="url-result">
+                        <div class="url-result-left">
+                            <input type="text" id="shortUrl" placeholder="縮短後的網址" readonly>
+                            <div class="button-group">
+                                <button onclick="copyShortUrl()">複製短網址</button>
+                                <button onclick="downloadQR()">下載 QR Code</button>
+                            </div>
+                        </div>
+                        <div class="url-result-right">
+                            <div id="qrcode"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div id="qrModal" class="modal">
+        <span class="close">&times;</span>
+        <img class="modal-content" id="qrImg">
+    </div>
+
+    <script>
+        function countCharacters() {
+            const text = document.getElementById('inputText').value;
+            const chineseRegex = /[\u4e00-\u9fa5]/g;
+            const englishRegex = /[a-zA-Z]/g;
+            const punctuationRegex = /[!"#$%&'()*+,-./:;<=>?@[\]^_`{|}~。，、；：？！…—·ˉˇ¨''""々～‖∶＂＇｀｜〃〔〕〈〉《》「」『』．〖〗【】（）［］｛｝]/g;
+
+            const chineseCount = (text.match(chineseRegex) || []).length;
+            const englishCount = (text.match(englishRegex) || []).length;
+            const punctuationCount = (text.match(punctuationRegex) || []).length;
+
+            document.getElementById('chineseCount').textContent = chineseCount;
+            document.getElementById('englishCount').textContent = englishCount;
+            document.getElementById('punctuationCount').textContent = punctuationCount;
+        }
+
+        document.getElementById('longUrl').addEventListener('input', async function() {
+            const longUrl = this.value;
+            if (longUrl) {
+                try {
+                    const response = await fetch(`https://tinyurl.com/api-create.php?url=${encodeURIComponent(longUrl)}`);
+                    const shortUrl = await response.text();
+                    document.getElementById('shortUrl').value = shortUrl;
+                    generateQRCode(shortUrl);
+                } catch (error) {
+                    console.error('Error shortening URL:', error);
+                    document.getElementById('shortUrl').value = '無法縮短網址，請稍後再試。';
+                }
+            } else {
+                document.getElementById('shortUrl').value = '';
+                document.getElementById('qrcode').innerHTML = '';
+            }
+        });
+
+        function copyShortUrl() {
+            const shortUrl = document.getElementById('shortUrl');
+            shortUrl.select();
+            document.execCommand('copy');
+            alert('短網址已複製到剪貼簿！');
+        }
+
+        function generateQRCode(url) {
+            const qr = qrcode(0, 'M');
+            qr.addData(url);
+            qr.make();
+            document.getElementById('qrcode').innerHTML = qr.createImgTag(5, 0, `QR Code for ${url}`);
+            document.getElementById('qrcode').onclick = showModal;
+        }
+
+        function downloadQR() {
+            const img = document.querySelector("#qrcode img");
+            if (img) {
+                const link = document.createElement('a');
+                link.download = 'qrcode.png';
+                link.href = img.src;
+                link.click();
+            } else {
+                alert('請先生成 QR Code');
+            }
+        }
+
+        function showModal() {
+            const modal = document.getElementById("qrModal");
+            const modalImg = document.getElementById("qrImg");
+            const qrImg = document.querySelector("#qrcode img");
+            modal.style.display = "block";
+            modalImg.src = qrImg.src;
+        }
+
+        const modal = document.getElementById("qrModal");
+        const span = document.getElementsByClassName("close")[0];
+
+        span.onclick = function() {
+            modal.style.display = "none";
+        }
+
+        window.onclick = function(event) {
+            if (event.target == modal) {
+                modal.style.display = "none";
+            }
+        }
+
+        window.onload = countCharacters;
+    </script>
+</body>
+</html>
