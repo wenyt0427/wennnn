@@ -1,0 +1,860 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>圖片編輯與即時剪切工具</title>
+    <style>
+        :root {
+            --primary-color: #4CAF50;
+            --secondary-color: #008CBA;
+            --background-color: #f0f0f0;
+            --canvas-border-color: #ccc;
+        }
+
+        body {
+            font-family: Arial, sans-serif;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            margin: 0;
+            background-color: var(--background-color);
+        }
+
+        .container {
+            display: flex;
+            gap: 30px;
+            background-color: white;
+            padding: 30px;
+            border-radius: 15px;
+            box-shadow: 0 0 15px rgba(0,0,0,0.1);
+        }
+
+        .canvas-container {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            position: relative;
+        }
+
+        canvas {
+            border: 2px solid var(--canvas-border-color);
+            margin-bottom: 15px;
+        }
+
+        #sourceCanvas, #targetCanvas {
+            cursor: none;
+        }
+
+        .tools {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 10px;
+            margin-bottom: 15px;
+            width: 100%;
+        }
+
+        button, .file-label {
+            padding: 10px 15px;
+            cursor: pointer;
+            background-color: var(--primary-color);
+            color: white;
+            border: none;
+            border-radius: 5px;
+            font-size: 16px;
+            text-align: center;
+            transition: all 0.3s;
+        }
+
+        button:hover, .file-label:hover {
+            filter: brightness(1.1);
+        }
+
+        button.active {
+            background-color: var(--secondary-color);
+            box-shadow: 0 0 10px rgba(0,0,0,0.5);
+            transform: scale(1.05);
+        }
+
+        button:disabled {
+            background-color: #cccccc;
+            cursor: not-allowed;
+        }
+
+        input[type="file"] {
+            display: none;
+        }
+
+        .file-label {
+            background-color: var(--secondary-color);
+        }
+
+        .slider-container {
+            display: flex;
+            flex-direction: column;
+            align-items: flex-start;
+            gap: 5px;
+            grid-column: span 2;
+        }
+
+        .slider-label {
+            font-size: 14px;
+            color: #333;
+            margin-bottom: 5px;
+        }
+
+        input[type="range"] {
+            width: 540px;
+        }
+
+        #cursor, #targetCursor {
+            position: absolute;
+            pointer-events: none;
+            border-radius: 50%;
+        }
+
+        .toggle-buttons, .undo-redo-buttons {
+            position: absolute;
+            top: 10px;
+            display: flex;
+            gap: 5px;
+        }
+
+        .toggle-buttons {
+            left: 10px;
+        }
+
+        .undo-redo-buttons {
+            right: 10px;
+        }
+
+        .toggle-button, .undo-redo-button {
+            padding: 5px 10px;
+            font-size: 12px;
+            background-color: rgba(240, 240, 240, 0.7);
+            border: 1px solid #ccc;
+            border-radius: 3px;
+            cursor: pointer;
+        }
+
+        .toggle-button.active {
+            background-color: var(--primary-color);
+            color: white;
+        }
+
+        .undo-redo-button:hover {
+            background-color: rgba(224, 224, 224, 0.7);
+        }
+
+        .undo-redo-button:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        .magnifier {
+            position: absolute;
+            width: 200px;
+            height: 200px;
+            border: 2px solid var(--canvas-border-color);
+            border-radius: 5px;
+            overflow: hidden;
+            left: 10px;
+            transition: top 0.3s ease;
+            display: none;
+        }
+
+        .magnifier canvas {
+            position: absolute;
+            top: 0;
+            left: 0;
+        }
+
+        .size-tooltip {
+            position: absolute;
+            background-color: rgba(0, 0, 0, 0.7);
+            color: white;
+            padding: 5px 10px;
+            border-radius: 5px;
+            font-size: 14px;
+            pointer-events: none;
+            opacity: 0;
+            transition: opacity 0.3s ease;
+        }
+
+        #homeButton {
+            position: fixed;
+            top: 10px;
+            left: 10px;
+            font-size: 24px;
+            background: none;
+            border: none;
+            cursor: pointer;
+            z-index: 1000;
+        }
+
+        #mobileWarning {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.8);
+            color: white;
+            font-size: 24px;
+            text-align: center;
+            padding-top: 50%;
+            z-index: 9999;
+        }
+    </style>
+</head>
+<body>
+    <button id="homeButton" onclick="window.location.href='https://www.google.com'">🏠</button>
+    <div id="mobileWarning">
+        抱歉，本工具不支援手機使用。請使用電腦訪問。
+    </div>
+    <div class="container">
+        <div class="canvas-container">
+            <canvas id="sourceCanvas" width="600" height="600"></canvas>
+            <div class="magnifier" id="sourceMagnifier">
+                <canvas id="sourceMagnifierCanvas" width="200" height="200"></canvas>
+            </div>
+            <div class="undo-redo-buttons">
+                <button id="undoButton" class="undo-redo-button" disabled>↩️</button>
+                <button id="redoButton" class="undo-redo-button" disabled>↪️</button>
+            </div>
+            <div class="tools">
+                <label for="imageUpload" class="file-label">上傳圖片</label>
+                <input type="file" id="imageUpload" accept="image/*">
+                <button id="brush" class="active">筆刷</button>
+                <button id="eraser">橡皮擦</button>
+                <button id="clearButton">清除筆跡</button>
+                <div class="slider-container">
+                    <span class="slider-label">筆刷大小: <span id="brushSizeValue">50</span></span>
+                    <input type="range" id="brushSize" min="1" max="100" value="50">
+                </div>
+                <div class="slider-container">
+                    <span class="slider-label">畫筆透明度: <span id="brushOpacityValue">100%</span></span>
+                    <input type="range" id="brushOpacity" min="0" max="100" value="100">
+                </div>
+                <div class="slider-container">
+                    <span class="slider-label">遮罩透明度: <span id="maskOpacityValue">50%</span></span>
+                    <input type="range" id="maskOpacity" min="0" max="100" value="50">
+                </div>
+                <div class="slider-container">
+                    <span class="slider-label">線稿強度: <span id="lineArtThresholdValue">50%</span></span>
+                    <input type="range" id="lineArtThreshold" min="0" max="100" value="50">
+                </div>
+            </div>
+        </div>
+        <div class="canvas-container">
+            <canvas id="targetCanvas" width="600" height="600"></canvas>
+            <div class="magnifier" id="targetMagnifier">
+                <canvas id="targetMagnifierCanvas" width="200" height="200"></canvas>
+            </div>
+            <div class="toggle-buttons">
+                <button id="toggleCrop" class="toggle-button active">截取</button>
+                <button id="toggleLineArt" class="toggle-button">線稿</button>
+            </div>
+            <div class="tools">
+                <button id="targetBrush" class="active">筆刷</button>
+                <button id="targetEraser">橡皮擦</button>
+                <div class="slider-container">
+                    <span class="slider-label">筆刷大小: <span id="targetBrushSizeValue">50</span></span>
+                    <input type="range" id="targetBrushSize" min="1" max="100" value="50">
+                </div>
+            </div>
+            <button id="downloadButton">下載圖片</button>
+        </div>
+    </div>
+    <div id="cursor"></div>
+    <div id="targetCursor"></div>
+    <div id="sizeTooltip" class="size-tooltip"></div>
+
+    <script id="workerScript" type="javascript/worker">
+        self.onmessage = function(e) {
+            const { imageData, threshold } = e.data;
+            const data = imageData.data;
+            for (let i = 0; i < data.length; i += 4) {
+                const brightness = 0.34 * data[i] + 0.5 * data[i + 1] + 0.16 * data[i + 2];
+                const color = brightness > threshold ? 255 : 0;
+                data[i] = data[i + 1] = data[i + 2] = color;
+            }
+            self.postMessage(imageData);
+        }
+    </script>
+
+    <script>
+        // 檢測是否為移動設備
+        function isMobileDevice() {
+            return (typeof window.orientation !== "undefined") || (navigator.userAgent.indexOf('IEMobile') !== -1);
+        }
+
+        // 如果是移動設備，顯示警告並禁用工具
+        if (isMobileDevice()) {
+            document.getElementById('mobileWarning').style.display = 'block';
+            document.querySelector('.container').style.display = 'none';
+        }
+
+        // 常量定義
+        const CANVAS_WIDTH = 600;
+        const CANVAS_HEIGHT = 600;
+        const MAX_STACK_SIZE = 20;
+        const MAGNIFIER_SIZE = 200;
+        const MAGNIFIER_SCALE = 4;
+
+        // 主要類
+        class ImageEditor {
+            constructor() {
+                this.initializeElements();
+                this.initializeState();
+                this.initializeEventListeners();
+                this.updateToolButtons();
+                this.updateTargetToolButtons();
+                this.updateUndoRedoButtons();
+                this.updateSliderValues();
+                this.initializeWorker();
+            }
+
+            initializeElements() {
+                this.sourceCanvas = document.getElementById('sourceCanvas');
+                this.targetCanvas = document.getElementById('targetCanvas');
+                this.ctx = this.sourceCanvas.getContext('2d', { willReadFrequently: true });
+                this.targetCtx = this.targetCanvas.getContext('2d', { willReadFrequently: true });
+                this.maskCanvas = document.createElement('canvas');
+                this.maskCanvas.width = CANVAS_WIDTH;
+                this.maskCanvas.height = CANVAS_HEIGHT;
+                this.maskCtx = this.maskCanvas.getContext('2d', { willReadFrequently: true });
+
+                this.offscreenSourceCanvas = document.createElement('canvas');
+                this.offscreenSourceCanvas.width = CANVAS_WIDTH;
+                this.offscreenSourceCanvas.height = CANVAS_HEIGHT;
+                this.offscreenSourceCtx = this.offscreenSourceCanvas.getContext('2d');
+
+                this.imageUpload = document.getElementById('imageUpload');
+                this.brushButton = document.getElementById('brush');
+                this.eraserButton = document.getElementById('eraser');
+                this.brushSize = document.getElementById('brushSize');
+                this.brushSizeValue = document.getElementById('brushSizeValue');
+                this.brushOpacity = document.getElementById('brushOpacity');
+                this.brushOpacityValue = document.getElementById('brushOpacityValue');
+                this.maskOpacity = document.getElementById('maskOpacity');
+                this.maskOpacityValue = document.getElementById('maskOpacityValue');
+                this.downloadButton = document.getElementById('downloadButton');
+                this.lineArtThreshold = document.getElementById('lineArtThreshold');
+                this.lineArtThresholdValue = document.getElementById('lineArtThresholdValue');
+                this.clearButton = document.getElementById('clearButton');
+                this.toggleCrop = document.getElementById('toggleCrop');
+                this.toggleLineArt = document.getElementById('toggleLineArt');
+                this.cursor = document.getElementById('cursor');
+                this.undoButton = document.getElementById('undoButton');
+                this.redoButton = document.getElementById('redoButton');
+                this.targetBrushButton = document.getElementById('targetBrush');
+                this.targetEraserButton = document.getElementById('targetEraser');
+                this.targetBrushSize = document.getElementById('targetBrushSize');
+                this.targetBrushSizeValue = document.getElementById('targetBrushSizeValue');
+                this.targetCursor = document.getElementById('targetCursor');
+                this.sourceMagnifier = document.getElementById('sourceMagnifier');
+                this.sourceMagnifierCanvas = document.getElementById('sourceMagnifierCanvas');
+                this.targetMagnifier = document.getElementById('targetMagnifier');
+                this.targetMagnifierCanvas = document.getElementById('targetMagnifierCanvas');
+                this.sizeTooltip = document.getElementById('sizeTooltip');
+            }
+
+            initializeState() {
+                this.isDrawing = false;
+                this.currentTool = 'brush';
+                this.originalImage = null;
+                this.displayMode = 'crop';
+                this.targetCurrentTool = 'brush';
+                this.undoStack = [];
+                this.redoStack = [];
+                this.tooltipTimeout = null;
+                this.sourceCanvasNeedsUpdate = false;
+                this.targetCanvasNeedsUpdate = false;
+            }
+
+            initializeEventListeners() {
+                this.imageUpload.addEventListener('change', this.handleImageUpload.bind(this));
+                this.sourceCanvas.addEventListener('dragover', this.handleDragOver.bind(this));
+                this.sourceCanvas.addEventListener('drop', this.handleDrop.bind(this));
+                this.sourceCanvas.addEventListener('mousedown', this.startDrawing.bind(this));
+                this.sourceCanvas.addEventListener('mousemove', this.draw.bind(this));
+                this.sourceCanvas.addEventListener('mouseup', this.stopDrawing.bind(this));
+                                this.sourceCanvas.addEventListener('mouseout', this.stopDrawing.bind(this));
+                this.sourceCanvas.addEventListener('mousemove', this.updateCursor.bind(this));
+                this.sourceCanvas.addEventListener('mouseenter', this.showCursor.bind(this));
+                this.sourceCanvas.addEventListener('mouseleave', this.hideCursor.bind(this));
+
+                this.brushButton.addEventListener('click', () => this.setTool('brush'));
+                this.eraserButton.addEventListener('click', () => this.setTool('eraser'));
+                this.brushSize.addEventListener('input', this.updateBrushSize.bind(this));
+                this.brushOpacity.addEventListener('input', this.updateBrushOpacity.bind(this));
+                this.maskOpacity.addEventListener('input', this.updateMaskOpacity.bind(this));
+                this.downloadButton.addEventListener('click', this.downloadImage.bind(this));
+                this.lineArtThreshold.addEventListener('input', this.handleLineArtThresholdChange.bind(this));
+                this.clearButton.addEventListener('click', this.clearMask.bind(this));
+                this.toggleCrop.addEventListener('click', () => this.setDisplayMode('crop'));
+                this.toggleLineArt.addEventListener('click', () => this.setDisplayMode('lineArt'));
+                this.undoButton.addEventListener('click', this.undo.bind(this));
+                this.redoButton.addEventListener('click', this.redo.bind(this));
+
+                this.targetCanvas.addEventListener('mousedown', this.startTargetDrawing.bind(this));
+                this.targetCanvas.addEventListener('mousemove', this.targetDraw.bind(this));
+                this.targetCanvas.addEventListener('mouseup', this.stopTargetDrawing.bind(this));
+                this.targetCanvas.addEventListener('mouseout', this.stopTargetDrawing.bind(this));
+                this.targetCanvas.addEventListener('mousemove', this.updateTargetCursor.bind(this));
+                this.targetCanvas.addEventListener('mouseenter', this.showTargetCursor.bind(this));
+                this.targetCanvas.addEventListener('mouseleave', this.hideTargetCursor.bind(this));
+
+                this.targetBrushButton.addEventListener('click', () => this.setTargetTool('brush'));
+                this.targetEraserButton.addEventListener('click', () => this.setTargetTool('eraser'));
+                this.targetBrushSize.addEventListener('input', this.updateTargetBrushSize.bind(this));
+
+                window.addEventListener('keydown', this.handleKeyDown.bind(this));
+            }
+
+            initializeWorker() {
+                const workerScript = document.getElementById('workerScript').textContent;
+                const blob = new Blob([workerScript], {type: 'text/javascript'});
+                this.worker = new Worker(URL.createObjectURL(blob));
+            }
+
+            handleImageUpload(e) {
+                const file = e.target.files[0];
+                this.loadImage(file);
+            }
+
+            handleDragOver(e) {
+                e.preventDefault();
+            }
+
+            handleDrop(e) {
+                e.preventDefault();
+                const file = e.dataTransfer.files[0];
+                if (file && file.type.startsWith('image/')) {
+                    this.loadImage(file);
+                }
+            }
+
+            loadImage(file) {
+                const reader = new FileReader();
+                reader.onload = (event) => {
+                    const img = new Image();
+                    img.onload = () => {
+                        this.originalImage = img;
+                        this.maskCtx.clearRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
+                        this.sourceCanvasNeedsUpdate = true;
+                        this.targetCanvasNeedsUpdate = true;
+                        this.updateSourceCanvas();
+                        this.updateTargetCanvas();
+                        this.saveState();
+
+                        // 強制重繪
+                        requestAnimationFrame(() => {
+                            this.updateSourceCanvas();
+                            this.updateTargetCanvas();
+                        });
+                    };
+                    img.src = event.target.result;
+                };
+                reader.readAsDataURL(file);
+            }
+
+            setTool(tool) {
+                this.currentTool = tool;
+                this.updateToolButtons();
+            }
+
+            updateToolButtons() {
+                this.brushButton.classList.toggle('active', this.currentTool === 'brush');
+                this.eraserButton.classList.toggle('active', this.currentTool === 'eraser');
+            }
+
+            setTargetTool(tool) {
+                this.targetCurrentTool = tool;
+                this.updateTargetToolButtons();
+            }
+
+            updateTargetToolButtons() {
+                this.targetBrushButton.classList.toggle('active', this.targetCurrentTool === 'brush');
+                this.targetEraserButton.classList.toggle('active', this.targetCurrentTool === 'eraser');
+            }
+
+            updateBrushSize() {
+                this.brushSizeValue.textContent = this.brushSize.value;
+                this.updateCursor({ target: this.sourceCanvas });
+            }
+
+            updateBrushOpacity() {
+                this.brushOpacityValue.textContent = `${this.brushOpacity.value}%`;
+                this.updateCursor({ target: this.sourceCanvas });
+                this.updateTargetCursor({ target: this.targetCanvas });
+            }
+
+            updateMaskOpacity() {
+                this.maskOpacityValue.textContent = `${this.maskOpacity.value}%`;
+                this.sourceCanvasNeedsUpdate = true;
+                this.updateSourceCanvas();
+            }
+
+            updateTargetBrushSize() {
+                this.targetBrushSizeValue.textContent = this.targetBrushSize.value;
+                this.updateTargetCursor({ target: this.targetCanvas });
+            }
+
+            startDrawing(e) {
+                this.isDrawing = true;
+                this.draw(e);
+            }
+
+            draw(e) {
+                if (!this.isDrawing) return;
+
+                const { x, y } = this.getCanvasCoordinates(e, this.sourceCanvas);
+
+                this.maskCtx.globalCompositeOperation = this.currentTool === 'brush' ? 'source-over' : 'destination-out';
+                this.maskCtx.fillStyle = this.currentTool === 'brush' ? 'rgb(255, 0, 0)' : 'rgb(0, 0, 0)';
+                this.maskCtx.beginPath();
+                this.maskCtx.arc(x, y, this.brushSize.value / 2, 0, Math.PI * 2);
+                this.maskCtx.fill();
+
+                this.sourceCanvasNeedsUpdate = true;
+                this.targetCanvasNeedsUpdate = true;
+                this.updateSourceCanvas();
+                this.updateTargetCanvas();
+                this.updateSourceMagnifier(x, y);
+            }
+
+            stopDrawing() {
+                if (this.isDrawing) {
+                    this.isDrawing = false;
+                    this.saveState();
+                }
+            }
+
+            startTargetDrawing(e) {
+                this.isDrawing = true;
+                this.targetDraw(e);
+            }
+
+            targetDraw(e) {
+                if (!this.isDrawing) return;
+
+                const { x, y } = this.getCanvasCoordinates(e, this.targetCanvas);
+
+                if (this.displayMode === 'crop') {
+                    this.drawOnTargetCanvas(x, y);
+                } else if (this.displayMode === 'lineArt') {
+                    this.drawLineArt(x, y);
+                }
+
+                this.updateMask(x, y);
+                this.sourceCanvasNeedsUpdate = true;
+                this.targetCanvasNeedsUpdate = true;
+                this.updateSourceCanvas();
+                this.updateTargetCanvas();
+                this.updateTargetMagnifier(x, y);
+            }
+
+            stopTargetDrawing() {
+                if (this.isDrawing) {
+                    this.isDrawing = false;
+                    this.saveState();
+                }
+            }
+
+            drawOnTargetCanvas(x, y) {
+                const brushRadius = this.targetBrushSize.value / 2;
+                if (this.targetCurrentTool === 'brush') {
+                    this.targetCtx.save();
+                    this.targetCtx.beginPath();
+                    this.targetCtx.arc(x, y, brushRadius, 0, Math.PI * 2);
+                    this.targetCtx.clip();
+                    this.targetCtx.drawImage(this.originalImage, 0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
+                    this.targetCtx.restore();
+                } else {
+                    this.targetCtx.globalCompositeOperation = 'destination-out';
+                    this.targetCtx.beginPath();
+                    this.targetCtx.arc(x, y, brushRadius, 0, Math.PI * 2);
+                    this.targetCtx.fill();
+                    this.targetCtx.globalCompositeOperation = 'source-over';
+                }
+            }
+
+            drawLineArt(x, y) {
+                this.targetCtx.fillStyle = this.targetCurrentTool === 'brush' ? 'black' : 'white';
+                this.targetCtx.beginPath();
+                this.targetCtx.arc(x, y, this.targetBrushSize.value / 2, 0, Math.PI * 2);
+                this.targetCtx.fill();
+            }
+
+            updateMask(x, y) {
+                this.maskCtx.globalCompositeOperation = this.targetCurrentTool === 'brush' ? 'source-over' : 'destination-out';
+                this.maskCtx.fillStyle = 'rgb(255, 0, 0)';
+                this.maskCtx.beginPath();
+                this.maskCtx.arc(x, y, this.targetBrushSize.value / 2, 0, Math.PI * 2);
+                this.maskCtx.fill();
+            }
+
+            updateSourceCanvas() {
+                this.offscreenSourceCtx.clearRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
+                if (this.originalImage) {
+                    this.offscreenSourceCtx.drawImage(this.originalImage, 0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
+                    
+                    const tempCanvas = document.createElement('canvas');
+                    tempCanvas.width = CANVAS_WIDTH;
+                    tempCanvas.height = CANVAS_HEIGHT;
+                    const tempCtx = tempCanvas.getContext('2d');
+                    
+                    tempCtx.drawImage(this.maskCanvas, 0, 0);
+                    tempCtx.globalCompositeOperation = 'source-in';
+                    tempCtx.fillStyle = `rgba(255, 0, 0, ${this.maskOpacity.value / 100})`;
+                    tempCtx.fillRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
+                    
+                    this.offscreenSourceCtx.drawImage(tempCanvas, 0, 0);
+                }
+                
+                this.ctx.clearRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
+                this.ctx.drawImage(this.offscreenSourceCanvas, 0, 0);
+                
+                this.sourceCanvasNeedsUpdate = false;
+            }
+
+            updateTargetCanvas() {
+                if (this.originalImage) {
+                    if (this.displayMode === 'crop') {
+                        this.targetCtx.clearRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
+                        this.targetCtx.drawImage(this.originalImage, 0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
+                        this.targetCtx.globalCompositeOperation = 'destination-in';
+                        this.targetCtx.drawImage(this.maskCanvas, 0, 0);
+                        this.targetCtx.globalCompositeOperation = 'source-over';
+                    } else if (this.displayMode === 'lineArt') {
+                        this.convertToLineArt();
+                    }
+                }
+                
+                this.targetCanvasNeedsUpdate = false;
+            }
+
+            convertToLineArt() {
+                if (!this.originalImage) return;
+
+                const tempCanvas = document.createElement('canvas');
+                tempCanvas.width = CANVAS_WIDTH;
+                tempCanvas.height = CANVAS_HEIGHT;
+                const tempCtx = tempCanvas.getContext('2d');
+
+                tempCtx.drawImage(this.originalImage, 0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
+                const imageData = tempCtx.getImageData(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
+
+                const threshold = parseInt(this.lineArtThreshold.value) * 2.55;
+
+                this.worker.postMessage({ imageData, threshold });
+                this.worker.onmessage = (e) => {
+                    this.targetCtx.putImageData(e.data, 0, 0);
+                };
+            }
+
+            getCanvasCoordinates(e, canvas) {
+                const rect = canvas.getBoundingClientRect();
+                return {
+                    x: e.clientX - rect.left,
+                    y: e.clientY - rect.top
+                };
+            }
+
+            clearMask() {
+                this.maskCtx.clearRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
+                this.sourceCanvasNeedsUpdate = true;
+                this.targetCanvasNeedsUpdate = true;
+                this.updateSourceCanvas();
+                this.updateTargetCanvas();
+                this.saveState();
+            }
+
+            setDisplayMode(mode) {
+                this.displayMode = mode;
+                this.toggleCrop.classList.toggle('active', mode === 'crop');
+                this.toggleLineArt.classList.toggle('active', mode === 'lineArt');
+                this.targetCanvasNeedsUpdate = true;
+                this.updateTargetCanvas();
+            }
+
+            saveState() {
+                const state = this.maskCtx.getImageData(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
+                this.undoStack.push(state);
+                if (this.undoStack.length > MAX_STACK_SIZE) {
+                    this.undoStack.shift();
+                }
+                this.redoStack = [];
+                this.updateUndoRedoButtons();
+            }
+
+            undo() {
+                if (this.undoStack.length > 1) {
+                    this.redoStack.push(this.undoStack.pop());
+                    const state = this.undoStack[this.undoStack.length - 1];
+                    this.maskCtx.putImageData(state, 0, 0);
+                    this.sourceCanvasNeedsUpdate = true;
+                    this.targetCanvasNeedsUpdate = true;
+                    this.updateSourceCanvas();
+                    this.updateTargetCanvas();
+                    this.updateUndoRedoButtons();
+                }
+            }
+
+            redo() {
+                if (this.redoStack.length > 0) {
+                    const state = this.redoStack.pop();
+                    this.undoStack.push(state);
+                    this.maskCtx.putImageData(state, 0, 0);
+                    this.sourceCanvasNeedsUpdate = true;
+                    this.targetCanvasNeedsUpdate = true;
+                    this.updateSourceCanvas();
+                    this.updateTargetCanvas();
+                    this.updateUndoRedoButtons();
+                }
+            }
+
+            updateUndoRedoButtons() {
+                this.undoButton.disabled = this.undoStack.length <= 1;
+                this.redoButton.disabled = this.redoStack.length === 0;
+            }
+
+                        updateCursor(e) {
+                const { x, y } = this.getCanvasCoordinates(e, this.sourceCanvas);
+                this.updateGenericCursor(e, this.sourceCanvas, this.cursor, this.brushSize.value, this.currentTool);
+                if (this.isInsideCanvas(x, y, this.sourceCanvas)) {
+                    this.updateSourceMagnifier(x, y);
+                } else {
+                    this.hideMagnifier(this.sourceMagnifier);
+                }
+            }
+
+            updateTargetCursor(e) {
+                const { x, y } = this.getCanvasCoordinates(e, this.targetCanvas);
+                this.updateGenericCursor(e, this.targetCanvas, this.targetCursor, this.targetBrushSize.value, this.targetCurrentTool);
+                if (this.isInsideCanvas(x, y, this.targetCanvas)) {
+                    this.updateTargetMagnifier(x, y);
+                } else {
+                    this.hideMagnifier(this.targetMagnifier);
+                }
+            }
+
+            updateGenericCursor(e, canvas, cursorElement, size, tool) {
+                cursorElement.style.left = `${e.clientX - size / 2}px`;
+                cursorElement.style.top = `${e.clientY - size / 2}px`;
+                cursorElement.style.width = `${size}px`;
+                cursorElement.style.height = `${size}px`;
+                
+                const opacity = this.brushOpacity.value / 100;
+                if (canvas === this.targetCanvas) {
+                    cursorElement.style.backgroundColor = tool === 'brush' ? `rgba(0, 0, 255, ${opacity})` : `rgba(128, 128, 128, ${opacity})`;
+                } else {
+                    cursorElement.style.backgroundColor = tool === 'brush' ? `rgba(255, 0, 0, ${opacity})` : `rgba(255, 255, 255, ${opacity})`;
+                }
+            }
+
+            isInsideCanvas(x, y, canvas) {
+                return x >= 0 && x <= canvas.width && y >= 0 && y <= canvas.height;
+            }
+
+            showCursor() {
+                this.cursor.style.display = 'block';
+            }
+
+            hideCursor() {
+                this.cursor.style.display = 'none';
+                this.hideMagnifier(this.sourceMagnifier);
+            }
+
+            showTargetCursor() {
+                this.targetCursor.style.display = 'block';
+            }
+
+            hideTargetCursor() {
+                this.targetCursor.style.display = 'none';
+                this.hideMagnifier(this.targetMagnifier);
+            }
+
+            hideMagnifier(magnifier) {
+                magnifier.style.display = 'none';
+            }
+
+            updateSourceMagnifier(x, y) {
+                this.updateMagnifierContent(this.sourceCanvas, this.sourceMagnifier, this.sourceMagnifierCanvas, x, y, this.brushSize.value);
+            }
+
+            updateTargetMagnifier(x, y) {
+                this.updateMagnifierContent(this.targetCanvas, this.targetMagnifier, this.targetMagnifierCanvas, x, y, this.targetBrushSize.value);
+            }
+
+            updateMagnifierContent(canvas, magnifier, magnifierCanvas, x, y, brushSize) {
+                const magnifierCtx = magnifierCanvas.getContext('2d');
+                const radius = MAGNIFIER_SIZE / 2;
+
+                magnifierCtx.clearRect(0, 0, MAGNIFIER_SIZE, MAGNIFIER_SIZE);
+                magnifierCtx.save();
+                magnifierCtx.translate(radius, radius);
+                magnifierCtx.scale(MAGNIFIER_SCALE, MAGNIFIER_SCALE);
+                magnifierCtx.translate(-x, -y);
+                magnifierCtx.drawImage(canvas, 0, 0);
+                magnifierCtx.restore();
+
+                // 在放大鏡中心繪製筆刷大小指示器
+                magnifierCtx.beginPath();
+                magnifierCtx.arc(MAGNIFIER_SIZE / 2, MAGNIFIER_SIZE / 2, brushSize * MAGNIFIER_SCALE / 2, 0, Math.PI * 2);
+                magnifierCtx.strokeStyle = 'rgba(255, 255, 255, 0.8)';
+                magnifierCtx.lineWidth = 2;
+                magnifierCtx.stroke();
+
+                magnifier.style.display = 'block';
+                if (y < CANVAS_HEIGHT / 2) {
+                    magnifier.style.top = `${CANVAS_HEIGHT - MAGNIFIER_SIZE - 10}px`;
+                } else {
+                    magnifier.style.top = '10px';
+                }
+            }
+
+            downloadImage() {
+                const link = document.createElement('a');
+                link.download = 'edited_image.png';
+                link.href = this.targetCanvas.toDataURL();
+                link.click();
+            }
+
+            handleLineArtThresholdChange() {
+                this.lineArtThresholdValue.textContent = `${this.lineArtThreshold.value}%`;
+                this.setDisplayMode('lineArt');
+                this.targetCanvasNeedsUpdate = true;
+                this.updateTargetCanvas();
+            }
+
+            handleKeyDown(e) {
+                if (e.ctrlKey) {
+                    if (e.key === 'z') {
+                        e.preventDefault();
+                        this.undo();
+                    } else if (e.key === 'y') {
+                        e.preventDefault();
+                        this.redo();
+                    }
+                }
+            }
+
+            updateSliderValues() {
+                this.brushSizeValue.textContent = this.brushSize.value;
+                this.brushOpacityValue.textContent = `${this.brushOpacity.value}%`;
+                this.maskOpacityValue.textContent = `${this.maskOpacity.value}%`;
+                this.lineArtThresholdValue.textContent = `${this.lineArtThreshold.value}%`;
+                this.targetBrushSizeValue.textContent = this.targetBrushSize.value;
+            }
+        }
+
+        // 初始化應用
+        const imageEditor = new ImageEditor();
+    </script>
+</body>
+</html>
