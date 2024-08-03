@@ -31,6 +31,7 @@
             width: 100%;
             max-width: 800px;
             overflow: hidden;
+            position: relative;
         }
         .content {
             background-image: url('https://tinyurl.com/329d5wa6');
@@ -182,6 +183,22 @@
             text-decoration: none;
             cursor: pointer;
         }
+        .home-button {
+            position: fixed;
+            top: 10px;
+            left: 10px;
+            font-size: 24px;
+            background-color: transparent;
+            color: white;
+            border: none;
+            cursor: pointer;
+            padding: 0;
+            z-index: 1000;
+            width: 33.6px;
+            height: 24px;
+            line-height: 24px;
+            text-align: center;
+        }
 
         @media (min-width: 768px) {
             body {
@@ -216,6 +233,7 @@
     </style>
 </head>
 <body>
+    <button class="home-button" onclick="goToHomePage()">🏠</button>
     <div class="container">
         <div class="content">
             <div class="panel">
@@ -339,6 +357,10 @@
             if (event.target == modal) {
                 modal.style.display = "none";
             }
+        }
+
+        function goToHomePage() {
+            window.location.href = "https://wenyt0427.github.io/wennnn/%E7%B6%B2%E9%A0%81%E5%B7%A5%E5%85%B7/%E4%B8%BB%E9%A0%81%E9%9D%A2";
         }
 
         window.onload = countCharacters;
