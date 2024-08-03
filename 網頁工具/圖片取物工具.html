@@ -19,13 +19,16 @@
             align-items: center;
             height: 100vh;
             margin: 0;
-            background-color: var(--background-color);
+            background-image: url('https://tinyurl.com/228epqaf');
+            background-size: cover;
+            background-position: center;
+            background-repeat: no-repeat;
         }
 
         .container {
             display: flex;
             gap: 30px;
-            background-color: white;
+            background-color: rgba(255, 255, 255, 0.8);
             padding: 30px;
             border-radius: 15px;
             box-shadow: 0 0 15px rgba(0,0,0,0.1);
@@ -210,7 +213,7 @@
     </style>
 </head>
 <body>
-    <button id="homeButton" onclick="window.location.href='https://wenyt0427.github.io/wennnn/%E7%B6%B2%E9%A0%81%E5%B7%A5%E5%85%B7/%E4%B8%BB%E9%A0%81%E9%9D%A2'">🏠</button>
+    <button id="homeButton" onclick="window.location.href='https://www.google.com'">🏠</button>
     <div id="mobileWarning">
         抱歉，本工具不支援手機使用。請使用電腦訪問。
     </div>
@@ -381,9 +384,9 @@
                 this.sourceCanvas.addEventListener('mouseout', this.stopDrawing.bind(this));
                 this.sourceCanvas.addEventListener('mousemove', this.updateCursor.bind(this));
                 this.sourceCanvas.addEventListener('mouseenter', this.showCursor.bind(this));
-                this.sourceCanvas.addEventListener('mouseleave', this.hideCursor.bind(this));
+                                this.sourceCanvas.addEventListener('mouseleave', this.hideCursor.bind(this));
 
-                                this.brushButton.addEventListener('click', () => this.setTool('brush'));
+                this.brushButton.addEventListener('click', () => this.setTool('brush'));
                 this.eraserButton.addEventListener('click', () => this.setTool('eraser'));
                 this.brushSize.addEventListener('input', this.updateBrushSize.bind(this));
                 this.brushOpacity.addEventListener('input', this.updateBrushOpacity.bind(this));
@@ -727,8 +730,7 @@
                     this.hideMagnifier(this.sourceMagnifier);
                 }
             }
-
-                        updateTargetCursor(e) {
+	                updateTargetCursor(e) {
                 const { x, y } = this.getCanvasCoordinates(e, this.targetCanvas);
                 this.updateGenericCursor(e, this.targetCanvas, this.targetCursor, this.targetBrushSize.value, this.targetCurrentTool);
                 if (this.isInsideCanvas(x, y, this.targetCanvas)) {
