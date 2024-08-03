@@ -18,6 +18,7 @@
             max-width: 800px;
             margin: 20px auto;
             padding: 20px;
+            position: relative;
         }
         .content-wrapper {
             background-image: url('https://tinyurl.com/23wy638f');
@@ -39,7 +40,7 @@
             backdrop-filter: blur(5px);
         }
         h1 {
-            color: #3498db; /* 更改為淺藍色 */
+            color: #3498db;
             text-align: center;
             font-size: 2.5em;
             margin-bottom: 30px;
@@ -179,6 +180,20 @@
         .instructions li {
             margin-bottom: 8px;
         }
+        .home-button {
+            position: fixed;
+            top: 10px;
+            left: 10px;
+            font-size: 24px;
+            background: none;
+            border: none;
+            cursor: pointer;
+            transition: transform 0.3s ease;
+            z-index: 9999; /* 確保按鈕在最上層 */
+        }
+        .home-button:hover {
+            transform: scale(1.2);
+        }
         @media (min-width: 768px) {
             .input-container {
                 flex-wrap: nowrap;
@@ -201,6 +216,7 @@
     </style>
 </head>
 <body>
+    <button class="home-button" onclick="window.location.href='https://wenyt0427.github.io/wennnn/%E7%B6%B2%E9%A0%81%E5%B7%A5%E5%85%B7/%E4%B8%BB%E9%A0%81%E9%9D%A2'">🏠</button>
     <div class="container">
         <div class="content-wrapper">
             <div class="content-overlay">
@@ -220,7 +236,6 @@
     </div>
 
     <script>
-        // JavaScript 代碼保持不變
         const framesContainer = document.getElementById('frames-container');
 
         function createFrame() {
