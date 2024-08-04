@@ -1,0 +1,325 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>圖片文字描繪工具</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            margin: 0;
+            background-color: #f0f0f0;
+            color: #333;
+        }
+        .container {
+            display: flex;
+            gap: 30px;
+            padding: 20px;
+            max-width: 1200px;
+            width: 100%;
+        }
+        .upload-section, .result-section {
+            background-color: white;
+            padding: 30px;
+            border-radius: 12px;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.1);
+            flex: 1;
+        }
+        h2 {
+            margin-top: 0;
+            color: #2c3e50;
+            font-size: 24px;
+            margin-bottom: 20px;
+        }
+        #imageInput {
+            display: none;
+        }
+        .upload-btn, .action-btn {
+            background-color: #3498db;
+            color: white;
+            padding: 10px 20px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            transition: background-color 0.3s;
+            font-size: 16px;
+            margin-bottom: 15px;
+        }
+        .upload-btn:hover, .action-btn:hover {
+            background-color: #2980b9;
+        }
+        #pasteArea {
+            width: auto;
+            height: auto;
+            border: 2px dashed #bdc3c7;
+            border-radius: 5px;
+            display: inline-flex;
+            justify-content: center;
+            align-items: center;
+            margin-bottom: 15px;
+            cursor: pointer;
+            transition: all 0.3s;
+            font-size: 16px;
+            color: #7f8c8d;
+            padding: 10px 20px;
+        }
+        #pasteArea:hover {
+            border-color: #3498db;
+            color: #3498db;
+        }
+        #originalImage {
+            max-width: 100%;
+            max-height: 400px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        #resolutionSelect, #customCharacters {
+            width: 100%;
+            padding: 10px;
+            margin-bottom: 15px;
+            border: 1px solid #bdc3c7;
+            border-radius: 5px;
+            font-size: 16px;
+        }
+        #resultText {
+            width: 100%;
+            height: 400px;
+            font-family: monospace;
+            white-space: pre;
+            overflow: auto;
+            resize: vertical;
+            border: 1px solid #bdc3c7;
+            border-radius: 5px;
+            padding: 10px;
+            font-size: 12px;
+            line-height: 1.2;
+        }
+        .control-panel {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 15px;
+        }
+        .action-buttons {
+            display: flex;
+            gap: 10px;
+        }
+        .upload-options {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 15px;
+        }
+        #homeButton {
+            position: fixed;
+            top: 20px;
+            left: 20px;
+            font-size: 24px;
+            text-decoration: none;
+            background-color: #3498db;
+            color: white;
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+            transition: background-color 0.3s;
+        }
+        #homeButton:hover {
+            background-color: #2980b9;
+        }
+        @media (max-width: 768px) {
+            .container {
+                flex-direction: column;
+            }
+        }
+    </style>
+</head>
+<body>
+    <a href="https://wenyt0427.github.io/wennnn/%E7%B6%B2%E9%A0%81%E5%B7%A5%E5%85%B7/%E4%B8%BB%E9%A0%81%E9%9D%A2" id="homeButton" title="回到首頁">🏠</a>
+    <div class="container">
+        <div class="upload-section">
+            <h2>上傳圖片</h2>
+            <div class="upload-options">
+                <label for="imageInput" class="upload-btn">選擇文件</label>
+                <div id="pasteArea">點擊這裡粘貼截圖</div>
+            </div>
+            <input type="file" id="imageInput" accept="image/*">
+            <img id="originalImage" alt="原始圖片">
+        </div>
+        <div class="result-section">
+            <div class="control-panel">
+                <h2>文字描繪結果</h2>
+                <div class="action-buttons">
+                    <button id="defaultBtn" class="action-btn">預設</button>
+                    <button id="undoBtn" class="action-btn">↩️</button>
+                    <button id="redoBtn" class="action-btn">↪️</button>
+                </div>
+            </div>
+            <select id="resolutionSelect">
+                <option value="1">最高 (1x1)</option>
+                <option value="2">非常高 (2x2)</option>
+                <option value="3">很高 (3x3)</option>
+                <option value="4" selected>高 (4x4)</option>
+                <option value="5">中高 (5x5)</option>
+                <option value="6">中 (6x6)</option>
+                <option value="7">中低 (7x7)</option>
+                <option value="8">低 (8x8)</option>
+                <option value="9">很低 (9x9)</option>
+                <option value="10">最低 (10x10)</option>
+            </select>
+            <input type="text" id="customCharacters" placeholder="輸入自定義字符集（從暗到亮）" value=".:-=+*#%@">
+            <textarea id="resultText" spellcheck="false"></textarea>
+        </div>
+    </div>
+
+    <script>
+        const imageInput = document.getElementById('imageInput');
+        const originalImage = document.getElementById('originalImage');
+        const resultText = document.getElementById('resultText');
+        const resolutionSelect = document.getElementById('resolutionSelect');
+        const pasteArea = document.getElementById('pasteArea');
+        const customCharacters = document.getElementById('customCharacters');
+        const defaultBtn = document.getElementById('defaultBtn');
+        const undoBtn = document.getElementById('undoBtn');
+        const redoBtn = document.getElementById('redoBtn');
+
+        let imageData = null;
+        const defaultCharacters = '.:-=+*#%@';
+        let history = [];
+        let historyIndex = -1;
+
+        imageInput.addEventListener('change', handleImageUpload);
+        resolutionSelect.addEventListener('change', processImage);
+        customCharacters.addEventListener('input', () => {
+            updateHistory();
+            processImage();
+        });
+        pasteArea.addEventListener('click', () => pasteArea.focus());
+        pasteArea.addEventListener('paste', handlePaste);
+        defaultBtn.addEventListener('click', setDefaultCharacters);
+        undoBtn.addEventListener('click', undo);
+        redoBtn.addEventListener('click', redo);
+
+        document.addEventListener('keydown', (e) => {
+            if (e.ctrlKey && e.key === 'z') {
+                e.preventDefault();
+                undo();
+            } else if (e.ctrlKey && e.key === 'y') {
+                e.preventDefault();
+                redo();
+            }
+        });
+
+        function handleImageUpload(e) {
+            const file = e.target.files[0];
+            if (file) {
+                loadImage(file);
+            }
+        }
+
+        function handlePaste(e) {
+            e.preventDefault();
+            const items = e.clipboardData.items;
+            for (let i = 0; i < items.length; i++) {
+                if (items[i].type.indexOf('image') !== -1) {
+                    const blob = items[i].getAsFile();
+                    loadImage(blob);
+                    break;
+                }
+            }
+        }
+
+        function loadImage(blob) {
+            const reader = new FileReader();
+            reader.onload = function(event) {
+                originalImage.src = event.target.result;
+                originalImage.onload = () => {
+                    const canvas = document.createElement('canvas');
+                    const ctx = canvas.getContext('2d');
+                    canvas.width = originalImage.width;
+                    canvas.height = originalImage.height;
+                    ctx.drawImage(originalImage, 0, 0, canvas.width, canvas.height);
+                    imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+                    processImage();
+                };
+            }
+            reader.readAsDataURL(blob);
+        }
+
+        function processImage() {
+            if (!imageData) return;
+
+            const { width, height, data } = imageData;
+            let result = '';
+            const resolution = parseInt(resolutionSelect.value);
+            const characters = customCharacters.value || defaultCharacters;
+
+            for (let y = 0; y < height; y += resolution) {
+                for (let x = 0; x < width; x += resolution) {
+                    const i = (y * width + x) * 4;
+                    const brightness = (data[i] + data[i + 1] + data[i + 2]) / 3;
+                    const charIndex = Math.floor(brightness / 255 * (characters.length - 1));
+                    result += characters[charIndex];
+                }
+                result += '\n';
+            }
+
+            updateResult(result);
+            adjustFontSize();
+        }
+
+        function adjustFontSize() {
+            const resolution = parseInt(resolutionSelect.value);
+            const fontSize = 12 / resolution;
+            resultText.style.fontSize = `${fontSize}px`;
+            resultText.style.lineHeight = `${fontSize}px`;
+        }
+
+        function setDefaultCharacters() {
+            customCharacters.value = defaultCharacters;
+            updateHistory();
+            processImage();
+        }
+
+        function updateHistory() {
+            const state = {
+                customCharacters: customCharacters.value,
+                resultText: resultText.value
+            };
+            history = history.slice(0, historyIndex + 1);
+            history.push(state);
+            historyIndex = history.length - 1;
+        }
+
+        function updateResult(newResult) {
+            resultText.value = newResult;
+            updateHistory();
+        }
+
+        function undo() {
+            if (historyIndex > 0) {
+                historyIndex--;
+                applyState(history[historyIndex]);
+            }
+        }
+
+        function redo() {
+            if (historyIndex < history.length - 1) {
+                historyIndex++;
+                applyState(history[historyIndex]);
+            }
+        }
+
+        function applyState(state) {
+            customCharacters.value = state.customCharacters;
+            resultText.value = state.resultText;
+        }
+    </script>
+</body>
+</html>
