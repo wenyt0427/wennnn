@@ -79,7 +79,7 @@
             margin-bottom: 15px;
         }
         .result-box {
-            flex: 0 0 calc(33.33% - 10px);
+            flex: 0 0 calc(50% - 5px);
             background-color: rgba(255, 255, 255, 0.8);
             padding: 10px;
             border-radius: 10px;
@@ -252,6 +252,10 @@
                         <h3>標點符號數</h3>
                         <p id="punctuationCount">0</p>
                     </div>
+                    <div class="result-box">
+                        <h3>Token 數</h3>
+                        <p id="tokenCount">0</p>
+                    </div>
                 </div>
                 <div class="url-shortener">
                     <input type="text" id="longUrl" placeholder="請輸入要縮短的網址">
@@ -281,16 +285,21 @@
         function countCharacters() {
             const text = document.getElementById('inputText').value;
             const chineseRegex = /[\u4e00-\u9fa5]/g;
-            const englishRegex = /[a-zA-Z]/g;
+            const englishRegex = /[a-zA-Z]+/g;
             const punctuationRegex = /[!"#$%&'()*+,-./:;<=>?@[\]^_`{|}~。，、；：？！…—·ˉˇ¨''""々～‖∶＂＇｀｜〃〔〕〈〉《》「」『』．〖〗【】（）［］｛｝]/g;
 
             const chineseCount = (text.match(chineseRegex) || []).length;
-            const englishCount = (text.match(englishRegex) || []).length;
+            const englishWords = text.match(englishRegex) || [];
+            const englishCount = englishWords.length;
             const punctuationCount = (text.match(punctuationRegex) || []).length;
+
+            // 估算Token數
+            const tokenCount = Math.ceil(chineseCount * 1.5 + englishCount + punctuationCount);
 
             document.getElementById('chineseCount').textContent = chineseCount;
             document.getElementById('englishCount').textContent = englishCount;
             document.getElementById('punctuationCount').textContent = punctuationCount;
+            document.getElementById('tokenCount').textContent = tokenCount;
         }
 
         document.getElementById('longUrl').addEventListener('input', async function() {
