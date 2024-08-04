@@ -1,0 +1,372 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>HTML 即時預覽工具</title>
+    <style>
+        body, html {
+            margin: 0;
+            padding: 0;
+            height: 100%;
+            font-family: 'Segoe UI', 'Roboto', 'Helvetica Neue', Arial, sans-serif;
+            transition: background-color 0.3s, color 0.3s;
+        }
+        .container {
+            display: flex;
+            height: 100%;
+        }
+        #editor, #preview {
+            height: 100%;
+            overflow: hidden;
+            transition: width 0.3s ease;
+        }
+        #editor {
+            display: flex;
+            flex-direction: column;
+            padding: 10px;
+            box-sizing: border-box;
+            position: relative;
+            width: 50%;
+            min-width: 100px; /* 確保按鈕區域始終可見 */
+            background-image: url('https://tinyurl.com/2bqwjtd2');
+            background-size: cover;
+            background-position: center;
+            background-repeat: no-repeat;
+        }
+        #preview {
+            width: 50%;
+            background-color: #f9f9f9;
+        }
+        #editorWrapper {
+            display: flex;
+            height: calc(100% - 80px);
+            border: 1px solid #000;
+            overflow: hidden;
+            background-color: rgba(255, 255, 255, 0.8); /* 半透明白色背景 */
+        }
+        #lineNumbers {
+            padding: 10px 5px;
+            background-color: rgba(240, 240, 240, 0.8);
+            border-right: 1px solid #ccc;
+            text-align: right;
+            font-family: monospace;
+            font-size: 14px;
+            user-select: none;
+            overflow-y: hidden;
+            line-height: 1.5;
+            white-space: pre;
+        }
+        #htmlInput {
+            flex-grow: 1;
+            border: none;
+            resize: none;
+            font-family: monospace;
+            padding: 10px;
+            box-sizing: border-box;
+            font-size: 14px;
+            font-weight: bold;
+            transition: background-color 0.3s, color 0.3s;
+            overflow-y: scroll;
+            line-height: 1.5;
+            white-space: pre;
+            background-color: rgba(255, 255, 255, 0.8); /* 半透明白色背景 */
+        }
+        .toolbar {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            display: flex;
+            gap: 10px;
+        }
+        .toolbar button, #homeButton, #themeToggle, #fullscreenToggle, #toggleCodeButton {
+            font-size: 20px;
+            background: rgba(255, 255, 255, 0.8);
+            border: none;
+            cursor: pointer;
+            padding: 5px;
+            border-radius: 5px;
+            transition: all 0.3s ease;
+        }
+        .toolbar button:hover, #homeButton:hover, #themeToggle:hover, #fullscreenToggle:hover, #toggleCodeButton:hover {
+            background-color: rgba(224, 224, 224, 0.8);
+        }
+        .toolbar button:active, #homeButton:active, #themeToggle:active, #fullscreenToggle:active, #toggleCodeButton:active {
+            background-color: rgba(189, 189, 189, 0.8);
+            transform: scale(0.95);
+        }
+        #homeButton {
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            font-size: 24px;
+            z-index: 1000;
+        }
+        #toggleCodeButton {
+            position: absolute;
+            top: 10px;
+            left: 50px;
+            font-size: 24px;
+            z-index: 1000;
+        }
+        #themeToggle {
+            position: absolute;
+            top: 10px;
+            left: 90px;
+            font-size: 24px;
+        }
+        #fullscreenToggle {
+            position: absolute;
+            top: 10px;
+            left: 130px;
+            font-size: 24px;
+        }
+        #title {
+            color: #2196F3;
+            font-size: 24px;
+            margin-bottom: 15px;
+            font-weight: bold;
+            letter-spacing: 0.5px;
+            margin-left: 170px;
+            line-height: 40px;
+            background-color: rgba(255, 255, 255, 0.8);
+            padding: 5px 10px;
+            border-radius: 5px;
+        }
+        body.dark-mode {
+            background-color: #1e1e1e;
+            color: #ffffff;
+        }
+        body.dark-mode #editorWrapper {
+            border-color: #555;
+            background-color: rgba(45, 45, 45, 0.8);
+        }
+        body.dark-mode #htmlInput {
+            background-color: rgba(45, 45, 45, 0.8);
+            color: #ffffff;
+        }
+        body.dark-mode #preview {
+            background-color: #2d2d2d;
+        }
+        body.dark-mode #title {
+            color: #64b5f6;
+            background-color: rgba(45, 45, 45, 0.8);
+        }
+        body.dark-mode #lineNumbers {
+            background-color: rgba(45, 45, 45, 0.8);
+            color: #ffffff;
+            border-color: #555;
+        }
+        body.dark-mode .toolbar button, 
+        body.dark-mode #homeButton, 
+        body.dark-mode #themeToggle, 
+        body.dark-mode #fullscreenToggle, 
+        body.dark-mode #toggleCodeButton {
+            background: rgba(45, 45, 45, 0.8);
+            color: #ffffff;
+        }
+        body.dark-mode .toolbar button:hover, 
+        body.dark-mode #homeButton:hover, 
+        body.dark-mode #themeToggle:hover, 
+        body.dark-mode #fullscreenToggle:hover, 
+        body.dark-mode #toggleCodeButton:hover {
+            background-color: rgba(70, 70, 70, 0.8);
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div id="editor">
+            <button id="homeButton" onclick="goHome()">🏠</button>
+            <button id="toggleCodeButton" onclick="toggleCode()">👁️</button>
+            <button id="themeToggle" onclick="toggleTheme()">☀️</button>
+            <button id="fullscreenToggle" onclick="toggleFullscreen()">⛶</button>
+            <div class="toolbar">
+                <button onclick="clearCode()" title="清除">🗑️</button>
+                <button onclick="undoCode()" title="撤銷">↩️</button>
+                <button onclick="redoCode()" title="重做">↪️</button>
+                <button onclick="saveAsHTML()" title="另存新檔">💾</button>
+            </div>
+            <div id="title">HTML代碼即時預覽工具</div>
+            <div id="editorWrapper">
+                <div id="lineNumbers"></div>
+                <textarea id="htmlInput" placeholder="在這裡輸入HTML代碼" spellcheck="false"></textarea>
+            </div>
+        </div>
+        <div id="preview"></div>
+    </div>
+
+    <script>
+        const container = document.querySelector('.container');
+        const editor = document.getElementById('editor');
+        const preview = document.getElementById('preview');
+        const htmlInput = document.getElementById('htmlInput');
+        const themeToggle = document.getElementById('themeToggle');
+        const lineNumbers = document.getElementById('lineNumbers');
+        const toggleCodeButton = document.getElementById('toggleCodeButton');
+        let isDarkMode = false;
+        let isCodeVisible = true;
+
+        let undoStack = [''];
+        let redoStack = [];
+        let isUndoRedo = false;
+
+        htmlInput.addEventListener('input', function() {
+            if (!isUndoRedo) {
+                updatePreview();
+            }
+            isUndoRedo = false;
+            updateLineNumbers();
+        });
+
+        htmlInput.addEventListener('scroll', function() {
+            lineNumbers.scrollTop = htmlInput.scrollTop;
+        });
+
+        function updatePreview() {
+            const iframe = document.createElement('iframe');
+            iframe.style.width = '100%';
+            iframe.style.height = '100%';
+            iframe.style.border = 'none';
+
+            preview.innerHTML = '';
+            preview.appendChild(iframe);
+
+            const doc = iframe.contentDocument || iframe.contentWindow.document;
+            doc.open();
+            doc.write(htmlInput.value);
+            doc.close();
+
+            undoStack.push(htmlInput.value);
+            redoStack = [];
+        }
+
+        function goHome() {
+            window.location.href = "https://wenyt0427.github.io/wennnn/%E7%B6%B2%E9%A0%81%E5%B7%A5%E5%85%B7/%E4%B8%BB%E9%A0%81%E9%9D%A2";
+        }
+
+        function clearCode() {
+            undoStack.push(htmlInput.value);
+            htmlInput.value = '';
+            updatePreview();
+            updateLineNumbers();
+        }
+
+        function undoCode() {
+            if (undoStack.length > 1) {
+                redoStack.push(undoStack.pop());
+                isUndoRedo = true;
+                htmlInput.value = undoStack[undoStack.length - 1];
+                updatePreviewWithoutPush();
+                updateLineNumbers();
+            }
+        }
+
+        function redoCode() {
+            if (redoStack.length > 0) {
+                isUndoRedo = true;
+                htmlInput.value = redoStack.pop();
+                undoStack.push(htmlInput.value);
+                updatePreviewWithoutPush();
+                updateLineNumbers();
+            }
+        }
+
+        function updatePreviewWithoutPush() {
+            const iframe = document.createElement('iframe');
+            iframe.style.width = '100%';
+            iframe.style.height = '100%';
+            iframe.style.border = 'none';
+
+            preview.innerHTML = '';
+            preview.appendChild(iframe);
+
+            const doc = iframe.contentDocument || iframe.contentWindow.document;
+            doc.open();
+            doc.write(htmlInput.value);
+            doc.close();
+        }
+
+        function toggleTheme() {
+            isDarkMode = !isDarkMode;
+            document.body.classList.toggle('dark-mode');
+            themeToggle.textContent = isDarkMode ? '🌙' : '☀️';
+        }
+
+        function toggleFullscreen() {
+            if (!document.fullscreenElement) {
+                document.documentElement.requestFullscreen();
+            } else {
+                if (document.exitFullscreen) {
+                    document.exitFullscreen();
+                }
+            }
+        }
+
+        function toggleCode() {
+            isCodeVisible = !isCodeVisible;
+            if (isCodeVisible) {
+                editor.style.width = '50%';
+                preview.style.width = '50%';
+                toggleCodeButton.textContent = '👁️';
+                themeToggle.style.display = 'block';
+                fullscreenToggle.style.display = 'block';
+                document.querySelector('.toolbar').style.display = 'flex';
+                document.getElementById('title').style.display = 'block';
+                document.getElementById('editorWrapper').style.display = 'flex';
+            } else {
+                editor.style.width = '100px';
+                preview.style.width = 'calc(100% - 100px)';
+                toggleCodeButton.textContent = '👁️‍🗨️';
+                themeToggle.style.display = 'none';
+                fullscreenToggle.style.display = 'none';
+                document.querySelector('.toolbar').style.display = 'none';
+                document.getElementById('title').style.display = 'none';
+                document.getElementById('editorWrapper').style.display = 'none';
+            }
+        }
+
+        async function saveAsHTML() {
+            if ('showSaveFilePicker' in window) {
+                try {
+                    const handle = await window.showSaveFilePicker({
+                        suggestedName: 'index.html',
+                        types: [{
+                            description: 'HTML File',
+                            accept: {'text/html': ['.html']},
+                        }],
+                    });
+                    const writable = await handle.createWritable();
+                    await writable.write(htmlInput.value);
+                    await writable.close();
+                } catch (err) {
+                    if (err.name !== 'AbortError') {
+                        console.error('保存文件時出錯:', err);
+                        alert('保存文件時出錯。請檢查控制台以獲取更多信息。');
+                    }
+                }
+            } else {
+                // 如果瀏覽器不支持 showSaveFilePicker，則回退到舊方法
+                const blob = new Blob([htmlInput.value], {type: 'text/html'});
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = 'index.html';
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                URL.revokeObjectURL(url);
+            }
+        }
+
+        function updateLineNumbers() {
+            const lines = htmlInput.value.split('\n');
+            lineNumbers.innerHTML = lines.map((_, index) => index + 1).join('\n');
+        }
+
+        // 初始化預覽和行號
+        updatePreview();
+        updateLineNumbers();
+    </script>
+</body>
+</html>
