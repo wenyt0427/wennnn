@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>MP4 to MP3 轉換器</title>
+    <title>影片轉 MP3 工具</title>
     <style>
         body {
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
@@ -114,10 +114,10 @@
 <body>
     <button id="homeButton" onclick="window.location.href='https://wenyt0427.github.io/wennnn/%E7%B6%B2%E9%A0%81%E5%B7%A5%E5%85%B7/%E4%B8%BB%E9%A0%81%E9%9D%A2'">🏠</button>
     <div class="container">
-        <h1>MP4 to MP3 轉換器</h1>
+        <h1>影片轉 MP3 工具</h1>
         <div class="input-group">
-            <input type="file" id="fileInput" accept="video/mp4">
-            <label for="fileInput">選擇 MP4 文件</label>
+            <input type="file" id="fileInput" accept="video/mp4,video/quicktime">
+            <label for="fileInput">選擇 MP4 或 MOV 文件</label>
         </div>
         <div class="input-group">
             <select id="quality">
@@ -136,7 +136,7 @@
         <div class="input-group">
             <button id="downloadBtn">下載 MP3</button>
         </div>
-        <p id="status">請選擇一個 MP4 文件</p>
+        <p id="status">請選擇一個 MP4 或 MOV 文件</p>
         <div id="progressContainer">
             <div id="progressBar">0%</div>
         </div>
@@ -144,7 +144,6 @@
 
     <script src="https://cdnjs.cloudflare.com/ajax/libs/lamejs/1.2.0/lame.min.js"></script>
     <script>
-        // JavaScript 代碼保持不變
         const fileInput = document.getElementById('fileInput');
         const convertBtn = document.getElementById('convertBtn');
         const downloadBtn = document.getElementById('downloadBtn');
@@ -163,10 +162,13 @@
             if (selectedFile.size > MAX_FILE_SIZE) {
                 status.textContent = '文件太大，請選擇小於 100MB 的文件';
                 convertBtn.disabled = true;
+            } else if (!selectedFile.type.startsWith('video/')) {
+                status.textContent = '請選擇有效的 MP4 或 MOV 文件';
+                convertBtn.disabled = true;
             } else {
                 convertBtn.disabled = false;
                 status.textContent = `已選擇文件: ${selectedFile.name}`;
-                fileNameInput.value = selectedFile.name.replace('.mp4', '');
+                fileNameInput.value = selectedFile.name.replace(/\.(mp4|mov)$/i, '');
             }
         });
 
