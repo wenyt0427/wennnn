@@ -1,0 +1,258 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MP4 to MP3 轉換器</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            margin: 0;
+            background-image: url('https://tinyurl.com/2yloljgu');
+            background-size: cover;
+            background-position: center;
+            background-repeat: no-repeat;
+            background-attachment: fixed;
+        }
+        .container {
+            background-color: rgba(255, 255, 255, 0.9);
+            padding: 30px;
+            border-radius: 12px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+            text-align: center;
+            width: 350px;
+        }
+        h1 {
+            color: #2c3e50;
+            margin-bottom: 20px;
+        }
+        #fileInput {
+            display: none;
+        }
+        .input-group {
+            margin-bottom: 15px;
+        }
+        label, button, select, input[type="text"] {
+            display: block;
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #bdc3c7;
+            border-radius: 5px;
+            font-size: 16px;
+            transition: all 0.3s ease;
+            box-sizing: border-box;
+        }
+        label, button {
+            background-color: #3498db;
+            color: white;
+            cursor: pointer;
+            border: none;
+        }
+        label:hover, button:hover {
+            background-color: #2980b9;
+        }
+        select, input[type="text"] {
+            background-color: #ecf0f1;
+            color: #2c3e50;
+        }
+        #status {
+            margin-top: 20px;
+            font-style: italic;
+            color: #7f8c8d;
+        }
+        #progressContainer {
+            width: 100%;
+            background-color: #ecf0f1;
+            margin-top: 20px;
+            border-radius: 5px;
+            overflow: hidden;
+            display: none;
+        }
+        #progressBar {
+            width: 0%;
+            height: 20px;
+            background-color: #2ecc71;
+            text-align: center;
+            line-height: 20px;
+            color: white;
+            transition: width 0.3s ease;
+        }
+        #downloadBtn {
+            display: none;
+            background-color: #27ae60;
+        }
+        #downloadBtn:hover {
+            background-color: #2ecc71;
+        }
+        #homeButton {
+            position: fixed;
+            top: 20px;
+            left: 20px;
+            font-size: 24px;
+            background: none;
+            border: none;
+            cursor: pointer;
+            z-index: 1000;
+            background-color: rgba(255, 255, 255, 0.7);
+            border-radius: 50%;
+            width: 50px;
+            height: 50px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            transition: background-color 0.3s ease;
+        }
+        #homeButton:hover {
+            background-color: rgba(255, 255, 255, 0.9);
+        }
+    </style>
+</head>
+<body>
+    <button id="homeButton" onclick="window.location.href='https://wenyt0427.github.io/wennnn/%E7%B6%B2%E9%A0%81%E5%B7%A5%E5%85%B7/%E4%B8%BB%E9%A0%81%E9%9D%A2'">🏠</button>
+    <div class="container">
+        <h1>MP4 to MP3 轉換器</h1>
+        <div class="input-group">
+            <input type="file" id="fileInput" accept="video/mp4">
+            <label for="fileInput">選擇 MP4 文件</label>
+        </div>
+        <div class="input-group">
+            <select id="quality">
+                <option value="128">128 kbps</option>
+                <option value="192">192 kbps</option>
+                <option value="256">256 kbps</option>
+                <option value="320">320 kbps</option>
+            </select>
+        </div>
+        <div class="input-group">
+            <input type="text" id="fileName" placeholder="輸入檔案名稱 (可選)">
+        </div>
+        <div class="input-group">
+            <button id="convertBtn" disabled>轉換</button>
+        </div>
+        <div class="input-group">
+            <button id="downloadBtn">下載 MP3</button>
+        </div>
+        <p id="status">請選擇一個 MP4 文件</p>
+        <div id="progressContainer">
+            <div id="progressBar">0%</div>
+        </div>
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/lamejs/1.2.0/lame.min.js"></script>
+    <script>
+        // JavaScript 代碼保持不變
+        const fileInput = document.getElementById('fileInput');
+        const convertBtn = document.getElementById('convertBtn');
+        const downloadBtn = document.getElementById('downloadBtn');
+        const qualitySelect = document.getElementById('quality');
+        const fileNameInput = document.getElementById('fileName');
+        const status = document.getElementById('status');
+        const progressContainer = document.getElementById('progressContainer');
+        const progressBar = document.getElementById('progressBar');
+
+        let selectedFile = null;
+        let convertedBlob = null;
+        const MAX_FILE_SIZE = 100 * 1024 * 1024; // 100 MB
+
+        fileInput.addEventListener('change', (e) => {
+            selectedFile = e.target.files[0];
+            if (selectedFile.size > MAX_FILE_SIZE) {
+                status.textContent = '文件太大，請選擇小於 100MB 的文件';
+                convertBtn.disabled = true;
+            } else {
+                convertBtn.disabled = false;
+                status.textContent = `已選擇文件: ${selectedFile.name}`;
+                fileNameInput.value = selectedFile.name.replace('.mp4', '');
+            }
+        });
+
+        convertBtn.addEventListener('click', async () => {
+            if (!selectedFile) return;
+
+            status.textContent = '正在準備轉換...';
+            progressContainer.style.display = 'block';
+            convertBtn.disabled = true;
+            downloadBtn.style.display = 'none';
+
+            try {
+                const audioBuffer = await extractAudio(selectedFile);
+                convertedBlob = await encodeMp3(audioBuffer, parseInt(qualitySelect.value));
+                
+                status.textContent = '轉換完成！點擊下載按鈕以保存文件。';
+                downloadBtn.style.display = 'block';
+            } catch (error) {
+                console.error('轉換錯誤:', error);
+                status.textContent = `轉換失敗: ${error.message}`;
+            } finally {
+                convertBtn.disabled = false;
+                progressContainer.style.display = 'none';
+            }
+        });
+
+        downloadBtn.addEventListener('click', () => {
+            if (!convertedBlob) return;
+
+            const fileName = fileNameInput.value.trim() || 'converted';
+            const url = URL.createObjectURL(convertedBlob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `${fileName}.mp3`;
+            a.click();
+            URL.revokeObjectURL(url);
+        });
+
+        async function extractAudio(file) {
+            const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+            const arrayBuffer = await file.arrayBuffer();
+            return await audioContext.decodeAudioData(arrayBuffer);
+        }
+
+        async function encodeMp3(audioBuffer, kbps) {
+            const sampleRate = audioBuffer.sampleRate;
+            const samples = audioBuffer.getChannelData(0);
+            const mp3encoder = new lamejs.Mp3Encoder(1, sampleRate, kbps);
+            const mp3Data = [];
+
+            const sampleBlockSize = 1152;
+            const totalSamples = samples.length;
+            
+            for (let i = 0; i < totalSamples; i += sampleBlockSize) {
+                const sampleChunk = samples.subarray(i, i + sampleBlockSize);
+                const int16SampleChunk = convertFloat32ToInt16(sampleChunk);
+                const mp3buf = mp3encoder.encodeBuffer(int16SampleChunk);
+                if (mp3buf.length > 0) {
+                    mp3Data.push(new Int8Array(mp3buf));
+                }
+                updateProgress(i / totalSamples);
+                await new Promise(resolve => setTimeout(resolve, 0));
+            }
+            
+            const mp3buf = mp3encoder.flush();
+            if (mp3buf.length > 0) {
+                mp3Data.push(new Int8Array(mp3buf));
+            }
+            
+            return new Blob(mp3Data, { type: 'audio/mp3' });
+        }
+
+        function convertFloat32ToInt16(float32Array) {
+            const int16Array = new Int16Array(float32Array.length);
+            for (let i = 0; i < float32Array.length; i++) {
+                const s = Math.max(-1, Math.min(1, float32Array[i]));
+                int16Array[i] = s < 0 ? s * 0x8000 : s * 0x7FFF;
+            }
+            return int16Array;
+        }
+
+        function updateProgress(ratio) {
+            const percent = Math.round(ratio * 100);
+            progressBar.style.width = `${percent}%`;
+            progressBar.textContent = `${percent}%`;
+        }
+    </script>
+</body>
+</html>
