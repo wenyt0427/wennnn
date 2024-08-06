@@ -35,6 +35,7 @@
         }
         .input-group {
             margin-bottom: 15px;
+            position: relative;
         }
         label, button, select, input[type="text"] {
             display: block;
@@ -74,18 +75,41 @@
         }
         #progressBar {
             width: 0%;
-            height: 20px;
+            height: 30px;
             background-color: #2ecc71;
             text-align: center;
-            line-height: 20px;
+            line-height: 30px;
             color: white;
             transition: width 0.3s ease;
         }
-        #downloadBtn {
+        #conversionStatus {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin-top: 10px;
+        }
+        #cancelBtn {
+            width: 30px;
+            height: 30px;
+            background-color: #e74c3c;
+            color: white;
+            border: none;
+            border-radius: 50%;
+            font-size: 16px;
+            cursor: pointer;
+            margin-left: 10px;
+            display: none;
+            line-height: 30px;
+            padding: 0;
+        }
+        #cancelBtn:hover {
+            background-color: #c0392b;
+        }
+        #downloadBtn, #reconvertBtn {
             display: none;
             background-color: #27ae60;
         }
-        #downloadBtn:hover {
+        #downloadBtn:hover, #reconvertBtn:hover {
             background-color: #2ecc71;
         }
         #homeButton {
@@ -109,6 +133,11 @@
         #homeButton:hover {
             background-color: rgba(255, 255, 255, 0.9);
         }
+        .file-name {
+            margin-top: 10px;
+            font-weight: bold;
+            color: #2c3e50;
+        }
     </style>
 </head>
 <body>
@@ -118,6 +147,7 @@
         <div class="input-group">
             <input type="file" id="fileInput" accept="video/mp4,video/quicktime">
             <label for="fileInput">選擇 MP4 或 MOV 文件</label>
+            <div id="fileName" class="file-name"></div>
         </div>
         <div class="input-group">
             <select id="quality">
@@ -128,72 +158,64 @@
             </select>
         </div>
         <div class="input-group">
-            <input type="text" id="fileName" placeholder="輸入檔案名稱 (可選)">
-        </div>
-        <div class="input-group">
-            <button id="convertBtn" disabled>轉換</button>
+            <input type="text" id="fileNameInput" placeholder="輸入檔案名稱 (可選)">
         </div>
         <div class="input-group">
             <button id="downloadBtn">下載 MP3</button>
         </div>
+        <div class="input-group">
+            <button id="reconvertBtn">重新轉換</button>
+        </div>
         <p id="status">請選擇一個 MP4 或 MOV 文件</p>
         <div id="progressContainer">
             <div id="progressBar">0%</div>
+        </div>
+        <div id="conversionStatus">
+            <span id="conversionText"></span>
+            <button id="cancelBtn">X</button>
         </div>
     </div>
 
     <script src="https://cdnjs.cloudflare.com/ajax/libs/lamejs/1.2.0/lame.min.js"></script>
     <script>
         const fileInput = document.getElementById('fileInput');
-        const convertBtn = document.getElementById('convertBtn');
         const downloadBtn = document.getElementById('downloadBtn');
+        const reconvertBtn = document.getElementById('reconvertBtn');
         const qualitySelect = document.getElementById('quality');
-        const fileNameInput = document.getElementById('fileName');
+        const fileNameInput = document.getElementById('fileNameInput');
         const status = document.getElementById('status');
         const progressContainer = document.getElementById('progressContainer');
         const progressBar = document.getElementById('progressBar');
+        const fileName = document.getElementById('fileName');
+        const cancelBtn = document.getElementById('cancelBtn');
+        const conversionText = document.getElementById('conversionText');
+        const conversionStatus = document.getElementById('conversionStatus');
 
         let selectedFile = null;
         let convertedBlob = null;
+        let isConverting = false;
+        let conversionCancelled = false;
+        let currentConversionId = 0;
         const MAX_FILE_SIZE = 100 * 1024 * 1024; // 100 MB
 
         fileInput.addEventListener('change', (e) => {
+            if (isConverting) {
+                cancelConversion();
+            }
             selectedFile = e.target.files[0];
             if (selectedFile.size > MAX_FILE_SIZE) {
                 status.textContent = '文件太大，請選擇小於 100MB 的文件';
-                convertBtn.disabled = true;
             } else if (!selectedFile.type.startsWith('video/')) {
                 status.textContent = '請選擇有效的 MP4 或 MOV 文件';
-                convertBtn.disabled = true;
             } else {
-                convertBtn.disabled = false;
-                status.textContent = `已選擇文件: ${selectedFile.name}`;
+                fileName.textContent = selectedFile.name;
                 fileNameInput.value = selectedFile.name.replace(/\.(mp4|mov)$/i, '');
+                status.textContent = '文件已上傳，準備轉換...';
+                startConversion();
             }
         });
 
-        convertBtn.addEventListener('click', async () => {
-            if (!selectedFile) return;
-
-            status.textContent = '正在準備轉換...';
-            progressContainer.style.display = 'block';
-            convertBtn.disabled = true;
-            downloadBtn.style.display = 'none';
-
-            try {
-                const audioBuffer = await extractAudio(selectedFile);
-                convertedBlob = await encodeMp3(audioBuffer, parseInt(qualitySelect.value));
-                
-                status.textContent = '轉換完成！點擊下載按鈕以保存文件。';
-                downloadBtn.style.display = 'block';
-            } catch (error) {
-                console.error('轉換錯誤:', error);
-                status.textContent = `轉換失敗: ${error.message}`;
-            } finally {
-                convertBtn.disabled = false;
-                progressContainer.style.display = 'none';
-            }
-        });
+        cancelBtn.addEventListener('click', cancelConversion);
 
         downloadBtn.addEventListener('click', () => {
             if (!convertedBlob) return;
@@ -207,13 +229,75 @@
             URL.revokeObjectURL(url);
         });
 
+        reconvertBtn.addEventListener('click', () => {
+            if (selectedFile) {
+                startConversion();
+            }
+        });
+
+        function cancelConversion() {
+            conversionCancelled = true;
+            isConverting = false;
+            status.textContent = '轉換已取消';
+            progressContainer.style.display = 'none';
+            conversionStatus.style.display = 'none';
+            reconvertBtn.style.display = 'block';
+            resetProgress();
+        }
+
+        function resetProgress() {
+            progressBar.style.width = '0%';
+            progressBar.textContent = '0%';
+        }
+
+        async function startConversion() {
+            if (!selectedFile) return;
+
+            currentConversionId++;
+            const thisConversionId = currentConversionId;
+
+            conversionText.textContent = '正在轉換...';
+            progressContainer.style.display = 'block';
+            conversionStatus.style.display = 'flex';
+            cancelBtn.style.display = 'block';
+            downloadBtn.style.display = 'none';
+            reconvertBtn.style.display = 'none';
+            isConverting = true;
+            conversionCancelled = false;
+            resetProgress();
+
+            try {
+                const audioBuffer = await extractAudio(selectedFile);
+                if (conversionCancelled || thisConversionId !== currentConversionId) return;
+                convertedBlob = await encodeMp3(audioBuffer, parseInt(qualitySelect.value), thisConversionId);
+                if (conversionCancelled || thisConversionId !== currentConversionId) return;
+                
+                status.textContent = '轉換完成！點擊下載按鈕以保存文件。';
+                downloadBtn.style.display = 'block';
+            } catch (error) {
+                console.error('轉換錯誤:', error);
+                if (error.message === 'Conversion cancelled') {
+                    status.textContent = '轉換已取消';
+                } else {
+                    status.textContent = `轉換失敗: ${error.message}`;
+                }
+                reconvertBtn.style.display = 'block';
+            } finally {
+                if (thisConversionId === currentConversionId) {
+                    isConverting = false;
+                    progressContainer.style.display = 'none';
+                    conversionStatus.style.display = 'none';
+                }
+            }
+        }
+
         async function extractAudio(file) {
             const audioContext = new (window.AudioContext || window.webkitAudioContext)();
             const arrayBuffer = await file.arrayBuffer();
             return await audioContext.decodeAudioData(arrayBuffer);
         }
 
-        async function encodeMp3(audioBuffer, kbps) {
+        async function encodeMp3(audioBuffer, kbps, conversionId) {
             const sampleRate = audioBuffer.sampleRate;
             const samples = audioBuffer.getChannelData(0);
             const mp3encoder = new lamejs.Mp3Encoder(1, sampleRate, kbps);
@@ -223,6 +307,7 @@
             const totalSamples = samples.length;
             
             for (let i = 0; i < totalSamples; i += sampleBlockSize) {
+                if (conversionCancelled || conversionId !== currentConversionId) throw new Error('Conversion cancelled');
                 const sampleChunk = samples.subarray(i, i + sampleBlockSize);
                 const int16SampleChunk = convertFloat32ToInt16(sampleChunk);
                 const mp3buf = mp3encoder.encodeBuffer(int16SampleChunk);
