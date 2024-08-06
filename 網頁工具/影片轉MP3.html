@@ -133,10 +133,59 @@
         #homeButton:hover {
             background-color: rgba(255, 255, 255, 0.9);
         }
-        .file-name {
+        .file-info {
+            display: flex;
+            align-items: center;
             margin-top: 10px;
+        }
+        .file-thumbnail {
+            width: 50px;
+            height: 50px;
+            object-fit: cover;
+            margin-right: 10px;
+            border-radius: 5px;
+        }
+        .file-details {
+            text-align: left;
+        }
+        .file-name {
             font-weight: bold;
             color: #2c3e50;
+        }
+        .file-size {
+            font-size: 14px;
+            color: #7f8c8d;
+        }
+        .button-group {
+            display: flex;
+            justify-content: space-between;
+        }
+        .button-group button {
+            width: 48%;
+        }
+        #audioPlayer {
+            width: 100%;
+            margin-top: 15px;
+            display: none;
+        }
+        #waveformContainer {
+            width: 100%;
+            height: 100px;
+            margin-top: 15px;
+            position: relative;
+            display: none;
+        }
+        #waveform {
+            width: 100%;
+            height: 100%;
+        }
+        #waveformOverlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
         }
     </style>
 </head>
@@ -147,7 +196,13 @@
         <div class="input-group">
             <input type="file" id="fileInput" accept="video/mp4,video/quicktime">
             <label for="fileInput">選擇 MP4 或 MOV 文件</label>
-            <div id="fileName" class="file-name"></div>
+            <div class="file-info">
+                <img id="thumbnail" class="file-thumbnail" style="display: none;">
+                <div class="file-details">
+                    <div id="fileName" class="file-name"></div>
+                    <div id="fileSize" class="file-size"></div>
+                </div>
+            </div>
         </div>
         <div class="input-group">
             <select id="quality">
@@ -160,13 +215,16 @@
         <div class="input-group">
             <input type="text" id="fileNameInput" placeholder="輸入檔案名稱 (可選)">
         </div>
-        <div class="input-group">
+        <div class="input-group button-group">
+            <button id="reconvertBtn">重新轉換</button>
             <button id="downloadBtn">下載 MP3</button>
         </div>
-        <div class="input-group">
-            <button id="reconvertBtn">重新轉換</button>
+        <audio id="audioPlayer" controls></audio>
+        <div id="waveformContainer">
+            <canvas id="waveform"></canvas>
+            <canvas id="waveformOverlay"></canvas>
         </div>
-        <p id="status">請選擇一個 MP4 或 MOV 文件</p>
+        <p id="status">請選擇一個 MP4 或 MOV 文件（最大 100MB）</p>
         <div id="progressContainer">
             <div id="progressBar">0%</div>
         </div>
@@ -187,9 +245,15 @@
         const progressContainer = document.getElementById('progressContainer');
         const progressBar = document.getElementById('progressBar');
         const fileName = document.getElementById('fileName');
+        const fileSize = document.getElementById('fileSize');
         const cancelBtn = document.getElementById('cancelBtn');
         const conversionText = document.getElementById('conversionText');
         const conversionStatus = document.getElementById('conversionStatus');
+        const thumbnail = document.getElementById('thumbnail');
+        const audioPlayer = document.getElementById('audioPlayer');
+        const waveformContainer = document.getElementById('waveformContainer');
+        const waveform = document.getElementById('waveform');
+        const waveformOverlay = document.getElementById('waveformOverlay');
 
         let selectedFile = null;
         let convertedBlob = null;
@@ -206,14 +270,34 @@
             if (selectedFile.size > MAX_FILE_SIZE) {
                 status.textContent = '文件太大，請選擇小於 100MB 的文件';
             } else if (!selectedFile.type.startsWith('video/')) {
-                status.textContent = '請選擇有效的 MP4 或 MOV 文件';
+                status.textContent = '請選擇有效的 MP4 或 MOV 文件（最大 100MB）';
             } else {
                 fileName.textContent = selectedFile.name;
+                const fileSizeInMB = (selectedFile.size / (1024 * 1024)).toFixed(2);
+                fileSize.textContent = `文件大小: ${fileSizeInMB} MB`;
                 fileNameInput.value = selectedFile.name.replace(/\.(mp4|mov)$/i, '');
                 status.textContent = '文件已上傳，準備轉換...';
+                generateThumbnail(selectedFile);
                 startConversion();
             }
         });
+
+        function generateThumbnail(file) {
+            const video = document.createElement('video');
+            video.preload = 'metadata';
+            video.onloadedmetadata = function() {
+                video.currentTime = 1; // 設置縮略圖時間點（這裡設為1秒）
+            }
+            video.oncanplay = function() {
+                const canvas = document.createElement('canvas');
+                canvas.width = 50;
+                canvas.height = 50;
+                canvas.getContext('2d').drawImage(video, 0, 0, canvas.width, canvas.height);
+                thumbnail.src = canvas.toDataURL();
+                thumbnail.style.display = 'block';
+            }
+            video.src = URL.createObjectURL(file);
+        }
 
         cancelBtn.addEventListener('click', cancelConversion);
 
@@ -231,6 +315,7 @@
 
         reconvertBtn.addEventListener('click', () => {
             if (selectedFile) {
+                status.textContent = '正在重新轉換，請稍後...';
                 startConversion();
             }
         });
@@ -242,6 +327,8 @@
             progressContainer.style.display = 'none';
             conversionStatus.style.display = 'none';
             reconvertBtn.style.display = 'block';
+            audioPlayer.style.display = 'none';
+            waveformContainer.style.display = 'none';
             resetProgress();
         }
 
@@ -262,6 +349,8 @@
             cancelBtn.style.display = 'block';
             downloadBtn.style.display = 'none';
             reconvertBtn.style.display = 'none';
+            audioPlayer.style.display = 'none';
+            waveformContainer.style.display = 'none';
             isConverting = true;
             conversionCancelled = false;
             resetProgress();
@@ -272,8 +361,20 @@
                 convertedBlob = await encodeMp3(audioBuffer, parseInt(qualitySelect.value), thisConversionId);
                 if (conversionCancelled || thisConversionId !== currentConversionId) return;
                 
-                status.textContent = '轉換完成！點擊下載按鈕以保存文件。';
+                status.textContent = '轉換完成！您可以試聽或下載 MP3 文件。';
                 downloadBtn.style.display = 'block';
+                reconvertBtn.style.display = 'block';
+                
+                // 顯示音頻播放器並設置音頻源
+                const audioUrl = URL.createObjectURL(convertedBlob);
+                audioPlayer.src = audioUrl;
+                audioPlayer.style.display = 'block';
+                
+                // 繪製波形
+                drawWaveform(audioBuffer);
+                
+                // 設置音頻播放器事件監聽器
+                setupAudioPlayerEvents();
             } catch (error) {
                 console.error('轉換錯誤:', error);
                 if (error.message === 'Conversion cancelled') {
@@ -292,38 +393,48 @@
         }
 
         async function extractAudio(file) {
-            const audioContext = new (window.AudioContext || window.webkitAudioContext)();
-            const arrayBuffer = await file.arrayBuffer();
-            return await audioContext.decodeAudioData(arrayBuffer);
+            try {
+                const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+                const arrayBuffer = await file.arrayBuffer();
+                                return await audioContext.decodeAudioData(arrayBuffer);
+            } catch (error) {
+                console.error('Audio extraction error:', error);
+                throw new Error('無法提取音頻。請嘗試使用不同的文件格式或瀏覽器。');
+            }
         }
 
         async function encodeMp3(audioBuffer, kbps, conversionId) {
-            const sampleRate = audioBuffer.sampleRate;
-            const samples = audioBuffer.getChannelData(0);
-            const mp3encoder = new lamejs.Mp3Encoder(1, sampleRate, kbps);
-            const mp3Data = [];
+            try {
+                const sampleRate = audioBuffer.sampleRate;
+                const samples = audioBuffer.getChannelData(0);
+                const mp3encoder = new lamejs.Mp3Encoder(1, sampleRate, kbps);
+                const mp3Data = [];
 
-            const sampleBlockSize = 1152;
-            const totalSamples = samples.length;
-            
-            for (let i = 0; i < totalSamples; i += sampleBlockSize) {
-                if (conversionCancelled || conversionId !== currentConversionId) throw new Error('Conversion cancelled');
-                const sampleChunk = samples.subarray(i, i + sampleBlockSize);
-                const int16SampleChunk = convertFloat32ToInt16(sampleChunk);
-                const mp3buf = mp3encoder.encodeBuffer(int16SampleChunk);
+                const sampleBlockSize = 1152;
+                const totalSamples = samples.length;
+                
+                for (let i = 0; i < totalSamples; i += sampleBlockSize) {
+                    if (conversionCancelled || conversionId !== currentConversionId) throw new Error('Conversion cancelled');
+                    const sampleChunk = samples.subarray(i, i + sampleBlockSize);
+                    const int16SampleChunk = convertFloat32ToInt16(sampleChunk);
+                    const mp3buf = mp3encoder.encodeBuffer(int16SampleChunk);
+                    if (mp3buf.length > 0) {
+                        mp3Data.push(new Int8Array(mp3buf));
+                    }
+                    updateProgress(i / totalSamples);
+                    await new Promise(resolve => setTimeout(resolve, 0));
+                }
+                
+                const mp3buf = mp3encoder.flush();
                 if (mp3buf.length > 0) {
                     mp3Data.push(new Int8Array(mp3buf));
                 }
-                updateProgress(i / totalSamples);
-                await new Promise(resolve => setTimeout(resolve, 0));
+                
+                return new Blob(mp3Data, { type: 'audio/mp3' });
+            } catch (error) {
+                console.error('MP3 encoding error:', error);
+                throw new Error('MP3 編碼失敗。請嘗試較低的比特率或較小的文件。');
             }
-            
-            const mp3buf = mp3encoder.flush();
-            if (mp3buf.length > 0) {
-                mp3Data.push(new Int8Array(mp3buf));
-            }
-            
-            return new Blob(mp3Data, { type: 'audio/mp3' });
         }
 
         function convertFloat32ToInt16(float32Array) {
@@ -340,6 +451,64 @@
             progressBar.style.width = `${percent}%`;
             progressBar.textContent = `${percent}%`;
         }
+
+        function drawWaveform(audioBuffer) {
+            const width = waveform.width;
+            const height = waveform.height;
+            const ctx = waveform.getContext('2d');
+            const data = audioBuffer.getChannelData(0);
+            const step = Math.ceil(data.length / width);
+            const amp = height / 2;
+
+            ctx.fillStyle = 'rgb(0, 0, 0)';
+            ctx.clearRect(0, 0, width, height);
+
+            for (let i = 0; i < width; i++) {
+                let min = 1.0;
+                let max = -1.0;
+                for (let j = 0; j < step; j++) {
+                    const datum = data[(i * step) + j];
+                    if (datum < min) min = datum;
+                    if (datum > max) max = datum;
+                }
+                ctx.fillRect(i, (1 + min) * amp, 1, Math.max(1, (max - min) * amp));
+            }
+
+            waveformContainer.style.display = 'block';
+        }
+
+        function setupAudioPlayerEvents() {
+            const overlayCtx = waveformOverlay.getContext('2d');
+            const width = waveformOverlay.width;
+            const height = waveformOverlay.height;
+
+            audioPlayer.addEventListener('timeupdate', () => {
+                const progress = audioPlayer.currentTime / audioPlayer.duration;
+                overlayCtx.clearRect(0, 0, width, height);
+                overlayCtx.fillStyle = 'rgba(255, 0, 0, 0.5)';
+                overlayCtx.fillRect(0, 0, width * progress, height);
+            });
+
+            waveformOverlay.addEventListener('click', (e) => {
+                const rect = waveformOverlay.getBoundingClientRect();
+                const x = e.clientX - rect.left;
+                const clickProgress = x / width;
+                audioPlayer.currentTime = audioPlayer.duration * clickProgress;
+            });
+        }
+
+        // 設置 canvas 大小
+        function resizeCanvas() {
+            const containerWidth = document.querySelector('.container').offsetWidth;
+            waveform.width = containerWidth;
+            waveform.height = 100;
+            waveformOverlay.width = containerWidth;
+            waveformOverlay.height = 100;
+        }
+
+        // 在窗口大小改變時重新設置 canvas 大小
+        window.addEventListener('resize', resizeCanvas);
+        resizeCanvas();
     </script>
 </body>
 </html>
