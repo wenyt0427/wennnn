@@ -1,0 +1,849 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PDF轉圖片工具</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.9.359/pdf.min.js"></script>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background-image: url('https://tinyurl.com/262gks3p');
+            background-size: cover;
+            background-position: center;
+            background-repeat: no-repeat;
+            background-attachment: fixed;
+            min-height: 100vh;
+        }
+        .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+        }
+        #dropZone {
+            border: 2px dashed #ccc;
+            border-radius: 20px;
+            width: 100%;
+            height: 100px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            cursor: pointer;
+            background-color: rgba(255, 255, 255, 0.8);
+        }
+        #progress {
+            width: 100%;
+            margin-top: 10px;
+        }
+        #pdfViewer {
+            margin-top: 20px;
+            border: 1px solid #ccc;
+            max-height: 500px;
+            overflow-y: auto;
+            background-color: rgba(255, 255, 255, 0.8);
+        }
+        #pageSelector {
+            margin-top: 20px;
+        }
+        .page-container {
+            position: relative;
+            margin-bottom: 20px;
+        }
+        .page-buttons {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            display: flex;
+            gap: 5px;
+        }
+        .page-button {
+            padding: 5px 10px;
+            background-color: #f0f0f0;
+            border: 1px solid #ccc;
+            border-radius: 3px;
+            cursor: pointer;
+        }
+        .page-number {
+            position: absolute;
+            bottom: 10px;
+            right: 10px;
+            background-color: rgba(255, 255, 255, 0.7);
+            padding: 2px 5px;
+            border-radius: 3px;
+        }
+        canvas {
+            max-width: 100%;
+            height: auto;
+        }
+        #undoRedoButtons {
+            display: flex;
+            gap: 5px;
+        }
+        #toolbox {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 10px;
+            background-color: rgba(255, 255, 255, 0.8);
+            padding: 10px;
+            border-radius: 5px;
+        }
+        .tool-button {
+            padding: 5px 10px;
+            background-color: #f0f0f0;
+            border: 1px solid #ccc;
+            border-radius: 3px;
+            cursor: pointer;
+        }
+        .tool-button.active {
+            background-color: #ddd;
+        }
+        .dropdown {
+            position: relative;
+            display: inline-block;
+        }
+        .dropdown-content {
+            display: none;
+            position: absolute;
+            background-color: #f9f9f9;
+            min-width: 160px;
+            box-shadow: 0px 8px 16px 0px rgba(0,0,0,0.2);
+            padding: 12px 16px;
+            z-index: 1;
+        }
+        .dropdown:hover .dropdown-content {
+            display: block;
+        }
+        .drawing-canvas {
+            position: absolute;
+            top: 0;
+            left: 0;
+            pointer-events: all;
+        }
+        .size-display {
+            display: inline-block;
+            width: 40px;
+            text-align: right;
+        }
+        #eraserCursor {
+            position: fixed;
+            pointer-events: none;
+            border: 2px solid black;
+            border-radius: 50%;
+            background-color: rgba(255, 255, 255, 0.5);
+            display: none;
+            box-sizing: border-box;
+            z-index: 1000;
+        }
+        .color-palette {
+            display: grid;
+            grid-template-columns: repeat(5, 1fr);
+            gap: 5px;
+            margin-top: 10px;
+        }
+        .color-swatch {
+            width: 20px;
+            height: 20px;
+            border-radius: 50%;
+            cursor: pointer;
+        }
+        #homeButton {
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            font-size: 24px;
+            cursor: pointer;
+            background: none;
+            border: none;
+            padding: 0;
+        }
+    </style>
+</head>
+<body>
+    <button id="homeButton" onclick="window.location.href='https://wenyt0427.github.io/wennnn/%E7%B6%B2%E9%A0%81%E5%B7%A5%E5%85%B7/%E4%B8%BB%E9%A0%81%E9%9D%A2'">🏠</button>
+    <div class="header">
+        <h1>PDF轉圖片工具</h1>
+        <div id="undoRedoButtons">
+            <button id="toggleButtons">👁️</button>
+            <button id="undoButton" disabled>↩️ 復原</button>
+            <button id="redoButton" disabled>↪️ 取消復原</button>
+        </div>
+    </div>
+    <div id="dropZone">
+        點擊或拖曳PDF檔案到此處
+        <input type="file" id="fileInput" accept=".pdf" style="display: none;">
+    </div>
+    <progress id="progress" value="0" max="100"></progress>
+    <div id="toolbox">
+        <button class="tool-button active" id="mouseTool">🖱️ 鼠標</button>
+        <div class="dropdown">
+            <button class="tool-button" id="pencilTool">✏️ 鉛筆</button>
+            <div class="dropdown-content">
+                <input type="color" id="pencilColor" value="#FF0000">
+                <input type="range" id="pencilSize" min="1" max="100" value="5">
+                <span class="size-display" id="pencilSizeDisplay">5px</span>
+                <div class="color-palette" id="pencilPalette"></div>
+            </div>
+        </div>
+        <div class="dropdown">
+            <button class="tool-button" id="eraserTool">🧽 橡皮擦</button>
+            <div class="dropdown-content">
+                <input type="range" id="eraserSize" min="5" max="100" value="100">
+                <span class="size-display" id="eraserSizeDisplay">20px</span>
+            </div>
+        </div>
+        <div class="dropdown">
+            <button class="tool-button" id="shapeTool">📐 形狀</button>
+            <div class="dropdown-content">
+                <select id="shapeType">
+                    <option value="rectangle">矩形</option>
+                    <option value="circle">圓形</option>
+                    <option value="line">直線</option>
+                    <option value="arrow">箭頭</option>
+                </select>
+                <input type="color" id="shapeColor" value="#FF0000">
+                <input type="range" id="shapeSize" min="1" max="20" value="4">
+                <span class="size-display" id="shapeSizeDisplay">4px</span>
+                <div class="color-palette" id="shapePalette"></div>
+            </div>
+        </div>
+        <button class="tool-button" id="clearAllTool">🗑️ 清除所有</button>
+    </div>
+    <div id="pdfViewer"></div>
+    <div id="pageSelector"></div>
+    <div id="eraserCursor"></div>
+
+    <script>
+        const dropZone = document.getElementById('dropZone');
+        const fileInput = document.getElementById('fileInput');
+        const progress = document.getElementById('progress');
+        const pdfViewer = document.getElementById('pdfViewer');
+        const pageSelector = document.getElementById('pageSelector');
+        const undoButton = document.getElementById('undoButton');
+        const redoButton = document.getElementById('redoButton');
+        const toggleButtons = document.getElementById('toggleButtons');
+        const eraserCursor = document.getElementById('eraserCursor');
+        const clearAllButton = document.getElementById('clearAllTool');
+
+        let pdfDoc = null;
+        let undoStack = [];
+        let redoStack = [];
+        let buttonsVisible = true;
+
+        let currentTool = 'mouse';
+        let isDrawing = false;
+        let lastX = 0;
+        let lastY = 0;
+
+        let drawingHistory = {};
+        let currentStroke = null;
+
+        let shapeStartX = 0;
+        let shapeStartY = 0;
+
+        const colorPalette = [
+            '#000000', '#FFFFFF', '#D3D3D3', '#808080', '#FFC0CB',
+            '#FF0000', '#FFA500', '#FFFF00', '#32CD32', '#008000',
+            '#0000FF', '#000080', '#800080', '#EE82EE', '#F5DEB3',
+            '#A52A2A', '#DEB887', '#FFFACD', '#98FB98', '#ADD8E6'
+        ];
+
+        function createColorPalette(paletteId, colorInputId) {
+            const palette = document.getElementById(paletteId);
+            const colorInput = document.getElementById(colorInputId);
+
+            colorPalette.forEach(color => {
+                const swatch = document.createElement('div');
+                swatch.className = 'color-swatch';
+                swatch.style.backgroundColor = color;
+                swatch.addEventListener('click', () => {
+                    colorInput.value = color;
+                    colorInput.dispatchEvent(new Event('change'));
+                });
+                palette.appendChild(swatch);
+            });
+        }
+
+        createColorPalette('pencilPalette', 'pencilColor');
+        createColorPalette('shapePalette', 'shapeColor');
+
+        dropZone.onclick = () => fileInput.click();
+
+        dropZone.ondragover = (e) => {
+            e.preventDefault();
+            dropZone.style.borderColor = '#000';
+        };
+
+        dropZone.ondragleave = () => {
+            dropZone.style.borderColor = '#ccc';
+        };
+
+        dropZone.ondrop = (e) => {
+            e.preventDefault();
+            dropZone.style.borderColor = '#ccc';
+            handleFile(e.dataTransfer.files[0]);
+        };
+
+        fileInput.onchange = () => handleFile(fileInput.files[0]);
+
+        undoButton.onclick = undo;
+        redoButton.onclick = redo;
+        toggleButtons.onclick = togglePageButtons;
+        clearAllButton.onclick = clearAllDrawings;
+
+        document.querySelectorAll('.tool-button').forEach(button => {
+            button.addEventListener('click', (e) => {
+                if (e.target.id !== 'clearAllTool') {
+                    currentTool = e.target.id.replace('Tool', '');
+                    document.querySelectorAll('.tool-button').forEach(btn => btn.classList.remove('active'));
+                    e.target.classList.add('active');
+                    updateCursor();
+                }
+            });
+        });
+
+        function updateCursor() {
+            const drawingCanvases = document.querySelectorAll('.drawing-canvas');
+            drawingCanvases.forEach(canvas => {
+                switch (currentTool) {
+                    case 'pencil':
+                    case 'shape':
+                        canvas.style.cursor = 'crosshair';
+                        eraserCursor.style.display = 'none';
+                        break;
+                    case 'eraser':
+                        canvas.style.cursor = 'none';
+                        eraserCursor.style.display = 'block';
+                        break;
+                    default:
+                        canvas.style.cursor = 'default';
+                        eraserCursor.style.display = 'none';
+                }
+            });
+        }
+
+        document.addEventListener('mousemove', (e) => {
+            if (currentTool === 'eraser') {
+                const eraserSize = parseInt(document.getElementById('eraserSize').value);
+                const cursorSize = eraserSize / 1.8;
+                eraserCursor.style.width = `${cursorSize}px`;
+                eraserCursor.style.height = `${cursorSize}px`;
+                eraserCursor.style.left = `${e.clientX - cursorSize / 2}px`;
+                eraserCursor.style.top = `${e.clientY - cursorSize / 2}px`;
+                eraserCursor.style.border = '2px solid black';
+
+                const pdfRect = pdfViewer.getBoundingClientRect();
+                if (e.clientX >= pdfRect.left && e.clientX <= pdfRect.right &&
+                    e.clientY >= pdfRect.top && e.clientY <= pdfRect.bottom) {
+                    eraserCursor.style.display = 'block';
+                } else {
+                    eraserCursor.style.display = 'none';
+                }
+            } else {
+                eraserCursor.style.display = 'none';
+            }
+        });
+
+        function handleFile(file) {
+            if (file.type !== 'application/pdf') {
+                alert('請上傳PDF檔案');
+                return;
+            }
+
+            const reader = new FileReader();
+            reader.onprogress = (e) => {
+                if (e.lengthComputable) {
+                    const percentLoaded = Math.round((e.loaded / e.total) * 100);
+                    progress.value = percentLoaded;
+                }
+            };
+
+            reader.onload = (e) => {
+                loadPDF(e.target.result);
+            };
+
+            reader.readAsArrayBuffer(file);
+        }
+
+        function loadPDF(data) {
+            pdfjsLib.getDocument({ data }).promise.then((pdf) => {
+                pdfDoc = pdf;
+                pdfViewer.innerHTML = '';
+                pageSelector.innerHTML = '';
+                undoStack = [];
+                redoStack = [];
+                drawingHistory = {};
+                updateUndoRedoButtons();
+
+                for (let i = 1; i <= pdf.numPages; i++) {
+                    renderPage(i);
+                }
+            });
+        }
+
+        function renderPage(pageNum) {
+            pdfDoc.getPage(pageNum).then((page) => {
+                const scale = 1.5;
+                const viewport = page.getViewport({ scale });
+                const pageContainer = document.createElement('div');
+                pageContainer.className = 'page-container';
+                pageContainer.id = `page-container-${pageNum}`;
+
+                const canvas = document.createElement('canvas');
+                const context = canvas.getContext('2d');
+		                canvas.height = viewport.height;
+                canvas.width = viewport.width;
+
+                const renderContext = {
+                    canvasContext: context,
+                    viewport: viewport
+                };
+                page.render(renderContext);
+
+                pageContainer.appendChild(canvas);
+
+                const drawingCanvas = document.createElement('canvas');
+                drawingCanvas.className = 'drawing-canvas';
+                drawingCanvas.width = canvas.width;
+                drawingCanvas.height = canvas.height;
+                pageContainer.appendChild(drawingCanvas);
+
+                initializeDrawingCanvas(drawingCanvas, pageNum);
+
+                const buttonsContainer = document.createElement('div');
+                buttonsContainer.className = 'page-buttons';
+
+                const copyButton = createButton('📋', () => copyPageToClipboard(pageNum, copyButton));
+                const pngButton = createButton('PNG', () => downloadPage(pageNum, 'png'));
+                const jpgButton = createButton('JPG', () => downloadPage(pageNum, 'jpg'));
+                const deleteButton = createButton('❌', () => deletePage(pageNum));
+
+                buttonsContainer.appendChild(copyButton);
+                buttonsContainer.appendChild(pngButton);
+                buttonsContainer.appendChild(jpgButton);
+                buttonsContainer.appendChild(deleteButton);
+                pageContainer.appendChild(buttonsContainer);
+
+                const pageNumberElement = document.createElement('div');
+                pageNumberElement.className = 'page-number';
+                pageNumberElement.textContent = `頁 ${pageNum}`;
+                pageContainer.appendChild(pageNumberElement);
+
+                pdfViewer.appendChild(pageContainer);
+
+                updateCursor();
+            });
+        }
+
+        function createButton(text, onClick) {
+            const button = document.createElement('button');
+            button.textContent = text;
+            button.className = 'page-button';
+            button.onclick = onClick;
+            return button;
+        }
+
+        function downloadPage(pageNum, format) {
+            const pageContainer = document.getElementById(`page-container-${pageNum}`);
+            const pdfCanvas = pageContainer.querySelector('canvas:not(.drawing-canvas)');
+            const drawingCanvas = pageContainer.querySelector('.drawing-canvas');
+
+            const mergedCanvas = document.createElement('canvas');
+            mergedCanvas.width = pdfCanvas.width;
+            mergedCanvas.height = pdfCanvas.height;
+            const ctx = mergedCanvas.getContext('2d');
+            ctx.drawImage(pdfCanvas, 0, 0);
+            ctx.drawImage(drawingCanvas, 0, 0);
+
+            const image = mergedCanvas.toDataURL(`image/${format}`);
+            const link = document.createElement('a');
+            link.href = image;
+            link.download = `page${pageNum}.${format}`;
+            link.click();
+        }
+
+        function deletePage(pageNum) {
+            const pageContainer = document.getElementById(`page-container-${pageNum}`);
+            if (pageContainer) {
+                const index = Array.from(pdfViewer.children).indexOf(pageContainer);
+                undoStack.push({
+                    action: 'delete',
+                    pageNum: pageNum,
+                    element: pageContainer,
+                    index: index,
+                    drawingHistory: drawingHistory[pageNum] || []
+                });
+                redoStack = [];
+                pageContainer.remove();
+                delete drawingHistory[pageNum];
+                updateUndoRedoButtons();
+            }
+        }
+
+        function copyPageToClipboard(pageNum, button) {
+            const pageContainer = document.getElementById(`page-container-${pageNum}`);
+            if (pageContainer) {
+                const pdfCanvas = pageContainer.querySelector('canvas:not(.drawing-canvas)');
+                const drawingCanvas = pageContainer.querySelector('.drawing-canvas');
+
+                const mergedCanvas = document.createElement('canvas');
+                mergedCanvas.width = pdfCanvas.width;
+                mergedCanvas.height = pdfCanvas.height;
+                const ctx = mergedCanvas.getContext('2d');
+
+                ctx.drawImage(pdfCanvas, 0, 0);
+                ctx.drawImage(drawingCanvas, 0, 0);
+
+                mergedCanvas.toBlob((blob) => {
+                    const item = new ClipboardItem({ "image/png": blob });
+                    navigator.clipboard.write([item]).then(() => {
+                        button.textContent = '✅';
+                        setTimeout(() => {
+                            button.textContent = '📋';
+                        }, 3000);
+                    }, (error) => {
+                        console.error("複製失敗: ", error);
+                        alert("複製到剪貼簿失敗，請檢查瀏覽器權限設置。");
+                    });
+                });
+            }
+        }
+
+        function undo() {
+            if (undoStack.length > 0) {
+                const action = undoStack.pop();
+                if (action.action === 'delete') {
+                    if (action.index >= pdfViewer.children.length) {
+                        pdfViewer.appendChild(action.element);
+                    } else {
+                        pdfViewer.insertBefore(action.element, pdfViewer.children[action.index]);
+                    }
+                    drawingHistory[action.pageNum] = action.drawingHistory;
+                    redoStack.push(action);
+                } else if (action.action === 'draw') {
+                    const canvas = document.querySelector(`#page-container-${action.pageNum} .drawing-canvas`);
+                    const ctx = canvas.getContext('2d');
+                    drawingHistory[action.pageNum].pop();
+                    redrawCanvas(ctx, drawingHistory[action.pageNum]);
+                    redoStack.push(action);
+                } else if (action.action === 'clearAll') {
+                    drawingHistory = JSON.parse(JSON.stringify(action.previousHistory));
+                    Object.keys(drawingHistory).forEach(pageNum => {
+                        const canvas = document.querySelector(`#page-container-${pageNum} .drawing-canvas`);
+                        const ctx = canvas.getContext('2d');
+                        redrawCanvas(ctx, drawingHistory[pageNum]);
+                    });
+                    redoStack.push(action);
+                }
+                updateUndoRedoButtons();
+            }
+        }
+
+        function redo() {
+            if (redoStack.length > 0) {
+                const action = redoStack.pop();
+                if (action.action === 'delete') {
+                    action.element.remove();
+                    delete drawingHistory[action.pageNum];
+                    undoStack.push(action);
+                } else if (action.action === 'draw') {
+                    const canvas = document.querySelector(`#page-container-${action.pageNum} .drawing-canvas`);
+                    const ctx = canvas.getContext('2d');
+                    drawingHistory[action.pageNum].push(action.stroke);
+                    redrawCanvas(ctx, drawingHistory[action.pageNum]);
+                    undoStack.push(action);
+                } else if (action.action === 'clearAll') {
+                    const previousHistory = JSON.parse(JSON.stringify(drawingHistory));
+                    Object.keys(drawingHistory).forEach(pageNum => {
+                        drawingHistory[pageNum] = [];
+                        const canvas = document.querySelector(`#page-container-${pageNum} .drawing-canvas`);
+                        const ctx = canvas.getContext('2d');
+                        ctx.clearRect(0, 0, canvas.width, canvas.height);
+                    });
+                    undoStack.push({
+                        action: 'clearAll',
+                        previousHistory: previousHistory
+                    });
+                }
+                updateUndoRedoButtons();
+            }
+        }
+
+        function updateUndoRedoButtons() {
+            undoButton.disabled = undoStack.length === 0;
+            redoButton.disabled = redoStack.length === 0;
+        }
+
+        function togglePageButtons() {
+            buttonsVisible = !buttonsVisible;
+            toggleButtons.textContent = buttonsVisible ? '👁️' : '👁️‍🗨️';
+            const pageButtons = document.querySelectorAll('.page-buttons');
+            const pageNumbers = document.querySelectorAll('.page-number');
+            pageButtons.forEach(buttonContainer => {
+                buttonContainer.style.display = buttonsVisible ? 'flex' : 'none';
+            });
+            pageNumbers.forEach(pageNumber => {
+                pageNumber.style.display = buttonsVisible ? 'block' : 'none';
+            });
+        }
+
+        function clearAllDrawings() {
+            const previousHistory = JSON.parse(JSON.stringify(drawingHistory));
+            Object.keys(drawingHistory).forEach(pageNum => {
+                drawingHistory[pageNum] = [];
+                const canvas = document.querySelector(`#page-container-${pageNum} .drawing-canvas`);
+                const ctx = canvas.getContext('2d');
+                ctx.clearRect(0, 0, canvas.width, canvas.height);
+            });
+            undoStack.push({
+                action: 'clearAll',
+                previousHistory: previousHistory
+            });
+            redoStack = [];
+            updateUndoRedoButtons();
+        }
+
+        function initializeDrawingCanvas(canvas, pageNum) {
+            const context = canvas.getContext('2d');
+            if (!drawingHistory[pageNum]) {
+                drawingHistory[pageNum] = [];
+            }
+
+            canvas.addEventListener('mousedown', startDrawing);
+            canvas.addEventListener('mousemove', draw);
+            canvas.addEventListener('mouseup', stopDrawing);
+            canvas.addEventListener('mouseout', stopDrawing);
+
+            canvas.addEventListener('touchstart', handleTouchStart);
+            canvas.addEventListener('touchmove', handleTouchMove);
+            canvas.addEventListener('touchend', handleTouchEnd);
+
+            function startDrawing(e) {
+                if (currentTool === 'mouse') return;
+                isDrawing = true;
+                [lastX, lastY] = getMousePosition(canvas, e);
+                currentStroke = {
+                    tool: currentTool,
+                    color: getToolColor(),
+                    lineWidth: getToolSize(),
+                    points: [{x: lastX, y: lastY}]
+                };
+
+                if (currentTool === 'shape') {
+                    shapeStartX = lastX;
+                    shapeStartY = lastY;
+                    currentStroke.shapeType = document.getElementById('shapeType').value;
+                }
+            }
+
+            function draw(e) {
+                if (!isDrawing || currentTool === 'mouse') return;
+
+                const [x, y] = getMousePosition(canvas, e);
+
+                if (currentTool === 'eraser') {
+                    context.globalCompositeOperation = 'destination-out';
+                    context.beginPath();
+                    context.arc(x, y, parseInt(document.getElementById('eraserSize').value) / 2, 0, Math.PI * 2);
+                    context.fill();
+                } else if (currentTool === 'pencil') {
+                    context.globalCompositeOperation = 'source-over';
+                    context.beginPath();
+                    context.moveTo(lastX, lastY);
+                    context.lineTo(x, y);
+                    setDrawingStyle(context, currentStroke);
+                    context.stroke();
+                } else if (currentTool === 'shape') {
+                    redrawCanvas(context, drawingHistory[pageNum]);
+                    drawShape(context, shapeStartX, shapeStartY, x, y, currentStroke);
+                }
+
+                currentStroke.points.push({x, y});
+
+                [lastX, lastY] = [x, y];
+            }
+
+            function stopDrawing() {
+                if (isDrawing) {
+                    isDrawing = false;
+                    if (currentStroke && currentStroke.points.length > 1) {
+                        drawingHistory[pageNum].push(currentStroke);
+                        undoStack.push({
+                            action: 'draw',
+                            pageNum: pageNum,
+                            stroke: currentStroke
+                        });
+                        redoStack = [];
+                        updateUndoRedoButtons();
+                    }
+                    currentStroke = null;
+                }
+            }
+
+            function handleTouchStart(e) {
+                e.preventDefault();
+                const touch = e.touches[0];
+                startDrawing(touch);
+            }
+
+            function handleTouchMove(e) {
+                e.preventDefault();
+                const touch = e.touches[0];
+                draw(touch);
+            }
+
+            function handleTouchEnd(e) {
+                e.preventDefault();
+                stopDrawing();
+            }
+        }
+
+        function getMousePosition(canvas, e) {
+            const rect = canvas.getBoundingClientRect();
+            const scaleX = canvas.width / rect.width;
+            const scaleY = canvas.height / rect.height;
+            return [
+                (e.clientX - rect.left) * scaleX,
+                (e.clientY - rect.top) * scaleY
+            ];
+        }
+
+        function getToolColor() {
+            switch (currentTool) {
+                case 'pencil':
+                    return document.getElementById('pencilColor').value;
+                case 'shape':
+                    return document.getElementById('shapeColor').value;
+                default:
+                    return '#FF0000';
+            }
+        }
+
+        function getToolSize() {
+            switch (currentTool) {
+                case 'pencil':
+                    return parseInt(document.getElementById('pencilSize').value);
+                case 'eraser':
+                    return parseInt(document.getElementById('eraserSize').value);
+                case 'shape':
+                    return parseInt(document.getElementById('shapeSize').value);
+                default:
+                    return 1;
+            }
+        }
+
+        function setDrawingStyle(context, stroke) {
+            context.strokeStyle = stroke.color;
+            context.lineWidth = stroke.lineWidth;
+            context.lineCap = 'round';
+            context.lineJoin = 'round';
+        }
+
+        function drawShape(ctx, startX, startY, endX, endY, stroke) {
+            setDrawingStyle(ctx, stroke);
+
+            ctx.beginPath();
+            switch (stroke.shapeType) {
+                case 'rectangle':
+                    ctx.rect(startX, startY, endX - startX, endY - startY);
+                    break;
+                case 'circle':
+                    const radius = Math.sqrt(Math.pow(endX - startX, 2) + Math.pow(endY - startY, 2));
+                    ctx.arc(startX, startY, radius, 0, 2 * Math.PI);
+                    break;
+                case 'line':
+                    ctx.moveTo(startX, startY);
+                    ctx.lineTo(endX, endY);
+                    break;
+                case 'arrow':
+                    drawArrow(ctx, startX, startY, endX, endY);
+                    break;
+            }
+            ctx.stroke();
+        }
+
+        function drawArrow(ctx, fromX, fromY, toX, toY) {
+            const headLength = 15;
+            const angle = Math.atan2(toY - fromY, toX - fromX);
+
+            ctx.moveTo(fromX, fromY);
+            ctx.lineTo(toX, toY);
+
+            ctx.lineTo(toX - headLength * Math.cos(angle - Math.PI / 6), toY - headLength * Math.sin(angle - Math.PI / 6));
+            ctx.moveTo(toX, toY);
+            ctx.lineTo(toX - headLength * Math.cos(angle + Math.PI / 6), toY - headLength * Math.sin(angle + Math.PI / 6));
+        }
+
+        function redrawCanvas(ctx, history) {
+            ctx.clearRect(0, 0, ctx.canvas.width, ctx.canvas.height);
+            history.forEach(stroke => {
+                if (stroke.tool === 'eraser') {
+                    ctx.globalCompositeOperation = 'destination-out';
+                    stroke.points.forEach(point => {
+                        ctx.beginPath();
+                        ctx.arc(point.x, point.y, stroke.lineWidth / 2, 0, Math.PI * 2);
+                        ctx.fill();
+			                    });
+                } else if (stroke.tool === 'pencil') {
+                    ctx.globalCompositeOperation = 'source-over';
+                    ctx.beginPath();
+                    setDrawingStyle(ctx, stroke);
+                    stroke.points.forEach((point, index) => {
+                        if (index === 0) {
+                            ctx.moveTo(point.x, point.y);
+                        } else {
+                            ctx.lineTo(point.x, point.y);
+                        }
+                    });
+                    ctx.stroke();
+                } else if (stroke.tool === 'shape') {
+                    ctx.globalCompositeOperation = 'source-over';
+                    const startPoint = stroke.points[0];
+                    const endPoint = stroke.points[stroke.points.length - 1];
+                    drawShape(ctx, startPoint.x, startPoint.y, endPoint.x, endPoint.y, stroke);
+                }
+            });
+            ctx.globalCompositeOperation = 'source-over';
+        }
+
+        function updateSizeDisplay(tool) {
+            const sizeInput = document.getElementById(`${tool}Size`);
+            const sizeDisplay = document.getElementById(`${tool}SizeDisplay`);
+            sizeDisplay.textContent = `${sizeInput.value}px`;
+        }
+
+        ['pencil', 'eraser', 'shape'].forEach(tool => {
+            const sizeInput = document.getElementById(`${tool}Size`);
+            if (sizeInput) {
+                sizeInput.addEventListener('input', () => {
+                    updateCursor();
+                    updateSizeDisplay(tool);
+                });
+                updateSizeDisplay(tool);
+            }
+        });
+
+        if (document.getElementById('pencilColor')) {
+            document.getElementById('pencilColor').addEventListener('change', updateCursor);
+        }
+
+        if (document.getElementById('shapeColor')) {
+            document.getElementById('shapeColor').addEventListener('change', updateCursor);
+        }
+
+        // 設置形狀大小的初始值
+        document.addEventListener('DOMContentLoaded', function() {
+            document.getElementById('shapeSize').value = '4';
+            document.getElementById('shapeSizeDisplay').textContent = '4px';
+
+            // 更新當前筆畫的默認線寬
+            if (currentStroke && currentStroke.tool === 'shape') {
+                currentStroke.lineWidth = 4;
+            }
+        });
+    </script>
+</body>
+</html>
