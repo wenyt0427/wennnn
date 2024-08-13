@@ -1,0 +1,110 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PDF轉圖片工具</title>
+    <link rel="stylesheet" href="styles.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.9.359/pdf.min.js"></script>
+</head>
+<body>
+    <div class="app-container">
+        <div id="topToolbar" class="top-toolbar">
+            <div class="toolbar-header">
+                <span>PDF轉圖片工具</span>
+            </div>
+            <div class="toolbar-content">
+                <button id="homeButton" onclick="window.location.href='https://wenyt0427.github.io/wennnn/%E7%B6%B2%E9%A0%81%E5%B7%A5%E5%85%B7/%E4%B8%BB%E9%A0%81%E9%9D%A2'" aria-label="返回主頁">🏠</button>
+                <div id="toggleButtonsContainer">
+                    <button id="toggleButtons" aria-label="切換頁面按鈕顯示">👁️</button>
+                </div>
+                <div id="dropZone" tabindex="0" role="button" aria-label="點擊或拖曳PDF檔案到此處">
+                    點擊或拖曳PDF檔案到此處
+                    <input type="file" id="fileInput" accept=".pdf" style="display: none;">
+                </div>
+                <button id="reuploadButton" style="display: none;">重新上傳 PDF</button>
+                <progress id="progress" value="0" max="100" aria-label="上傳進度"></progress>
+                <div id="toolbox" role="toolbar" aria-label="繪圖工具">
+                    <button class="tool-button active" id="mouseTool" aria-label="選擇鼠標工具">🖱️ 鼠標</button>
+                    <div class="dropdown">
+                        <button class="tool-button" id="pencilTool" aria-label="選擇鉛筆工具">✏️ 鉛筆</button>
+                        <div class="dropdown-content">
+                            <label for="pencilColor">選擇顏色：</label>
+                            <input type="color" id="pencilColor" value="#FF0000" aria-label="選擇鉛筆顏色">
+                            <div class="color-palette" id="pencilPalette" aria-label="鉛筆顏色調色板"></div>
+                            <label for="pencilSize">選擇大小：</label>
+                            <input type="range" id="pencilSize" min="1" max="100" value="4" aria-label="選擇鉛筆大小">
+                            <span class="size-display" id="pencilSizeDisplay">4px</span>
+                        </div>
+                    </div>
+                    <div class="dropdown">
+                        <button class="tool-button" id="highlighterTool" aria-label="選擇螢光筆工具">🖍️ 螢光筆</button>
+                        <div class="dropdown-content">
+                            <label for="highlighterColor">選擇顏色：</label>
+                            <input type="color" id="highlighterColor" value="#FFFF00" aria-label="選擇螢光筆顏色">
+                            <div class="color-palette" id="highlighterPalette" aria-label="螢光筆顏色調色板"></div>
+                            <label for="highlighterSize">選擇大小：</label>
+                            <input type="range" id="highlighterSize" min="5" max="100" value="40" aria-label="選擇螢光筆大小">
+                            <span class="size-display" id="highlighterSizeDisplay">40px</span>
+                            <label for="highlighterOpacity">選擇透明度：</label>
+                            <input type="range" id="highlighterOpacity" min="0" max="100" value="50" aria-label="選擇螢光筆透明度">
+                            <span class="opacity-display" id="highlighterOpacityDisplay">50%</span>
+                        </div>
+                    </div>
+                    <div class="dropdown">
+                        <button class="tool-button" id="shapeTool" aria-label="選擇形狀工具">🔲 形狀</button>
+                        <div class="dropdown-content">
+                            <div id="shapeButtons">
+                                <button class="shape-button active" data-shape="rectangle" aria-label="選擇矩形">🔲</button>
+                                <button class="shape-button" data-shape="circle" aria-label="選擇圓形">🔘</button>
+                                <button class="shape-button" data-shape="line" aria-label="選擇直線">┃</button>
+                                <button class="shape-button" data-shape="arrow" aria-label="選擇箭頭">➜</button>
+                            </div>
+                            <label for="shapeColor">選擇顏色：</label>
+                            <input type="color" id="shapeColor" value="#FF0000" aria-label="選擇形狀顏色">
+                            <div class="color-palette" id="shapePalette" aria-label="形狀顏色調色板"></div>
+                            <label for="shapeSize">選擇線條粗細：</label>
+                            <input type="range" id="shapeSize" min="1" max="100" value="4" aria-label="選擇形狀線條粗細">
+                            <span class="size-display" id="shapeSizeDisplay">4px</span>
+                            <label for="shapeOpacity">選擇透明度：</label>
+                            <input type="range" id="shapeOpacity" min="0" max="100" value="100" aria-label="選擇形狀透明度">
+                            <span class="opacity-display" id="shapeOpacityDisplay">100%</span>
+                            <div class="checkbox-container">
+                                <input type="checkbox" id="shapeFill" aria-label="填充形狀">
+                                <label for="shapeFill">填充（僅適用於矩形和圓形）</label>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="dropdown">
+                        <button class="tool-button" id="eraserTool" aria-label="選擇橡皮擦工具">🧽 橡皮擦</button>
+                        <div class="dropdown-content">
+                            <label for="eraserSize">選擇大小：</label>
+                            <input type="range" id="eraserSize" min="5" max="100" value="40" aria-label="選擇橡皮擦大小">
+                            <span class="size-display" id="eraserSizeDisplay">40px</span>
+                        </div>
+                    </div>
+                    <button class="tool-button" id="undoTool" aria-label="撤銷">↩️ 撤銷</button>
+                    <button class="tool-button" id="redoTool" aria-label="重做">↪️ 重做</button>
+                    <button class="tool-button" id="clearAllTool" aria-label="清除全部">🗑️ 清除全部</button>
+                </div>
+            </div>
+        </div>
+        <div class="content-container">
+            <div class="sidebar">
+                <div id="thumbnailContainer"></div>
+            </div>
+            <div class="main-content">
+                <div id="pdfViewer" role="main" aria-label="PDF內容"></div>
+                <div id="pageSelector"></div>
+                <div id="eraserCursor"></div>
+            </div>
+        </div>
+    </div>
+    <div id="notification" aria-live="polite"></div>
+
+    <script src="utils.js"></script>
+    <script src="drawingTools.js"></script>
+    <script src="pdfHandler.js"></script>
+    <script src="app.js"></script>
+</body>
+</html>
