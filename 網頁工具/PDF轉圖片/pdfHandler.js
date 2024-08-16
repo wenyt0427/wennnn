@@ -1,6 +1,10 @@
 const PDFHandler = (function(utils, drawingTools) {
     let pdfDoc = null;
     let currentPage = 1;
+    let pageScales = new Map();
+    const RENDER_SCALE = 2; // 提高渲染解析度
+    let isDownloading = false; // 防止重複下載
+    let originalFileName = ''; // 儲存原始檔案名稱
 
     function handleFile(file) {
         if (file.type !== 'application/pdf') {
@@ -8,11 +12,17 @@ const PDFHandler = (function(utils, drawingTools) {
             return;
         }
 
+        originalFileName = file.name.replace('.pdf', ''); // 儲存原始檔案名稱（不含副檔名）
+
         const reader = new FileReader();
+        reader.onloadstart = () => {
+            showUploadProgress();
+        };
+
         reader.onprogress = (e) => {
             if (e.lengthComputable) {
                 const percentLoaded = Math.round((e.loaded / e.total) * 100);
-                document.getElementById('progress').value = percentLoaded;
+                updateUploadProgress(percentLoaded);
             }
         };
 
@@ -20,7 +30,26 @@ const PDFHandler = (function(utils, drawingTools) {
             loadPDF(e.target.result);
         };
 
+        reader.onloadend = () => {
+            hideUploadProgress();
+        };
+
         reader.readAsArrayBuffer(file);
+    }
+
+    function showUploadProgress() {
+        const progressContainer = document.getElementById('progressContainer');
+        progressContainer.style.display = 'block';
+        document.getElementById('uploadProgress').value = 0;
+    }
+
+    function updateUploadProgress(percent) {
+        document.getElementById('uploadProgress').value = percent;
+    }
+
+    function hideUploadProgress() {
+        const progressContainer = document.getElementById('progressContainer');
+        progressContainer.style.display = 'none';
     }
 
     function loadPDF(data) {
@@ -48,15 +77,26 @@ const PDFHandler = (function(utils, drawingTools) {
 
     function renderPage(pageNum) {
         pdfDoc.getPage(pageNum).then((page) => {
-            const scale = 1.5;
-            const viewport = page.getViewport({ scale });
+            const originalViewport = page.getViewport({ scale: 1 });
+            const scale = RENDER_SCALE;
+            const viewport = page.getViewport({ scale: scale });
             const pageContainer = document.createElement('div');
             pageContainer.className = 'page-container';
             pageContainer.id = `page-container-${pageNum}`;
             const canvas = document.createElement('canvas');
             const context = canvas.getContext('2d');
+
             canvas.height = viewport.height;
             canvas.width = viewport.width;
+
+            pageScales.set(pageNum, {
+                scale: scale,
+                width: originalViewport.width,
+                height: originalViewport.height,
+                viewportWidth: viewport.width,
+                viewportHeight: viewport.height,
+                rotation: page.rotate
+            });
 
             const renderContext = {
                 canvasContext: context,
@@ -74,6 +114,12 @@ const PDFHandler = (function(utils, drawingTools) {
             pageContainer.appendChild(drawingCanvas);
 
             drawingTools.initializeDrawingCanvas(drawingCanvas, pageNum);
+
+            drawingCanvas.addEventListener('mousedown', (e) => {
+                if (currentPage !== pageNum) {
+                    setActivePage(pageNum, false);
+                }
+            });
 
             const buttonsContainer = document.createElement('div');
             buttonsContainer.className = 'page-buttons';
@@ -104,8 +150,7 @@ const PDFHandler = (function(utils, drawingTools) {
 
     function renderThumbnail(pageNum) {
         pdfDoc.getPage(pageNum).then((page) => {
-            const scale = 0.2;
-            const viewport = page.getViewport({ scale });
+            const viewport = page.getViewport({ scale: 0.2 });
             const canvas = document.createElement('canvas');
             const context = canvas.getContext('2d');
             canvas.height = viewport.height;
@@ -196,7 +241,7 @@ const PDFHandler = (function(utils, drawingTools) {
         ctx.drawImage(pdfCanvas, 0, 0);
         ctx.drawImage(drawingCanvas, 0, 0);
 
-        const image = mergedCanvas.toDataURL(`image/${format}`);
+        const image = mergedCanvas.toDataURL(`image/${format}`, 1.0);
         const link = document.createElement('a');
         link.href = image;
         link.download = `page${pageNum}.${format}`;
@@ -229,6 +274,86 @@ const PDFHandler = (function(utils, drawingTools) {
         setActivePage(pageNum, true);
     }
 
+    async function downloadPDF() {
+        if (!pdfDoc || isDownloading) {
+            return;
+        }
+
+        isDownloading = true;
+        utils.showNotification('正在準備下載 PDF，請稍候...');
+
+        const progressBar = document.getElementById('downloadProgress');
+        progressBar.style.display = 'inline-block';
+        progressBar.value = 0;
+
+        try {
+            const pdfBytes = await pdfDoc.getData();
+            const existingPdfDoc = await PDFLib.PDFDocument.load(pdfBytes);
+            const newPdfDoc = await PDFLib.PDFDocument.create();
+
+            for (let i = 1; i <= pdfDoc.numPages; i++) {
+                const [embeddedPage] = await newPdfDoc.embedPdf(existingPdfDoc, [i - 1]);
+                const { width, height } = embeddedPage.scale(1);
+                const page = newPdfDoc.addPage([width, height]);
+                page.drawPage(embeddedPage);
+
+                const pageImage = await createCompressedPageImage(i);
+                const image = await newPdfDoc.embedPng(pageImage);
+                page.drawImage(image, {
+                    x: 0,
+                    y: 0,
+                    width: width,
+                    height: height,
+                });
+
+                progressBar.value = (i / pdfDoc.numPages) * 100;
+            }
+
+            const pdfBytesCompressed = await newPdfDoc.save({
+                useObjectStreams: false,
+                addDefaultPage: false,
+                objectsPerTick: 100,
+                updateFieldAppearances: false,
+                compress: true
+            });
+
+            const compressedPdfBlob = new Blob([pdfBytesCompressed], { type: 'application/pdf' });
+            
+            // 使用 FileSaver.js 的 saveAs 函數來觸發檔案保存對話框
+            saveAs(compressedPdfBlob, `${originalFileName}_Wennnn_Studio.pdf`);
+
+            utils.showNotification('PDF 準備完成，請選擇保存位置');
+        } catch (error) {
+            console.error('PDF 下載失敗:', error);
+            utils.showNotification('PDF 下載失敗，請重試');
+        } finally {
+            isDownloading = false;
+            progressBar.style.display = 'none';
+        }
+    }
+
+    async function createCompressedPageImage(pageNum) {
+        const pageContainer = document.getElementById(`page-container-${pageNum}`);
+        const drawingCanvas = pageContainer.querySelector('.drawing-canvas');
+
+        const mergedCanvas = document.createElement('canvas');
+        mergedCanvas.width = drawingCanvas.width;
+        mergedCanvas.height = drawingCanvas.height;
+        const ctx = mergedCanvas.getContext('2d');
+
+        ctx.drawImage(drawingCanvas, 0, 0);
+
+        return new Promise((resolve) => {
+            mergedCanvas.toBlob((blob) => {
+                const reader = new FileReader();
+                reader.onloadend = function() {
+                    resolve(reader.result);
+                }
+                reader.readAsDataURL(blob);
+            }, 'image/png', 0.5);  // 使用 50% 的質量，可以根據需要調整
+        });
+    }
+
     return {
         handleFile: handleFile,
         loadPDF: loadPDF,
@@ -239,6 +364,7 @@ const PDFHandler = (function(utils, drawingTools) {
         deletePage: deletePage,
         navigatePage: navigatePage,
         scrollToPage: scrollToPage,
-        setActivePage: setActivePage
+        setActivePage: setActivePage,
+        downloadPDF: downloadPDF
     };
 })(Utils, DrawingTools);
