@@ -319,7 +319,6 @@ const PDFHandler = (function(utils, drawingTools) {
 
             const compressedPdfBlob = new Blob([pdfBytesCompressed], { type: 'application/pdf' });
             
-            // 使用 FileSaver.js 的 saveAs 函數來觸發檔案保存對話框
             saveAs(compressedPdfBlob, `${originalFileName}_Wennnn_Studio.pdf`);
 
             utils.showNotification('PDF 準備完成，請選擇保存位置');
@@ -334,13 +333,15 @@ const PDFHandler = (function(utils, drawingTools) {
 
     async function createCompressedPageImage(pageNum) {
         const pageContainer = document.getElementById(`page-container-${pageNum}`);
+        const pdfCanvas = pageContainer.querySelector('canvas:not(.drawing-canvas)');
         const drawingCanvas = pageContainer.querySelector('.drawing-canvas');
 
         const mergedCanvas = document.createElement('canvas');
-        mergedCanvas.width = drawingCanvas.width;
-        mergedCanvas.height = drawingCanvas.height;
+        mergedCanvas.width = pdfCanvas.width;
+        mergedCanvas.height = pdfCanvas.height;
         const ctx = mergedCanvas.getContext('2d');
 
+        ctx.drawImage(pdfCanvas, 0, 0);
         ctx.drawImage(drawingCanvas, 0, 0);
 
         return new Promise((resolve) => {
