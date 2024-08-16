@@ -6,6 +6,7 @@
     <title>PDF轉圖片工具</title>
     <link rel="stylesheet" href="styles.css">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.9.359/pdf.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 </head>
 <body>
     <div class="app-container">
@@ -18,16 +19,20 @@
                 <div id="toggleButtonsContainer">
                     <button id="toggleButtons" aria-label="切換頁面按鈕顯示">👁️</button>
                 </div>
-                <div id="dropZone" tabindex="0" role="button" aria-label="點擊或拖曳PDF檔案到此處">
-                    點擊或拖曳PDF檔案到此處
-                    <input type="file" id="fileInput" accept=".pdf" style="display: none;">
+                <div id="uploadContainer">
+                    <div id="dropZone" tabindex="0" role="button" aria-label="點擊或拖曳PDF檔案到此處">
+                        點擊或拖曳PDF檔案到此處
+                        <input type="file" id="fileInput" accept=".pdf" style="display: none;">
+                    </div>
+                    <div id="progressContainer" style="display: none;">
+                        <progress id="uploadProgress" value="0" max="100" aria-label="上傳進度"></progress>
+                    </div>
                 </div>
                 <button id="reuploadButton" style="display: none;">重新上傳 PDF</button>
-                <progress id="progress" value="0" max="100" aria-label="上傳進度"></progress>
                 <div id="toolbox" role="toolbar" aria-label="繪圖工具">
                     <button class="tool-button active" id="mouseTool" aria-label="選擇鼠標工具">🖱️ 鼠標</button>
                     <div class="dropdown">
-                        <button class="tool-button" id="pencilTool" aria-label="選擇鉛筆工具">✏️ 鉛筆</button>
+                        <button class="tool-button color-indicator" id="pencilTool" aria-label="選擇鉛筆工具">✏️ 鉛筆</button>
                         <div class="dropdown-content">
                             <label for="pencilColor">選擇顏色：</label>
                             <input type="color" id="pencilColor" value="#FF0000" aria-label="選擇鉛筆顏色">
@@ -38,7 +43,7 @@
                         </div>
                     </div>
                     <div class="dropdown">
-                        <button class="tool-button" id="highlighterTool" aria-label="選擇螢光筆工具">🖍️ 螢光筆</button>
+                        <button class="tool-button color-indicator" id="highlighterTool" aria-label="選擇螢光筆工具">🖍️ 螢光筆</button>
                         <div class="dropdown-content">
                             <label for="highlighterColor">選擇顏色：</label>
                             <input type="color" id="highlighterColor" value="#FFFF00" aria-label="選擇螢光筆顏色">
@@ -52,7 +57,7 @@
                         </div>
                     </div>
                     <div class="dropdown">
-                        <button class="tool-button" id="shapeTool" aria-label="選擇形狀工具">🔲 形狀</button>
+                        <button class="tool-button color-indicator" id="shapeTool" aria-label="選擇形狀工具">🔲 形狀</button>
                         <div class="dropdown-content">
                             <div id="shapeButtons">
                                 <button class="shape-button active" data-shape="rectangle" aria-label="選擇矩形">🔲</button>
@@ -86,11 +91,16 @@
                     <button class="tool-button" id="undoTool" aria-label="撤銷">↩️ 撤銷</button>
                     <button class="tool-button" id="redoTool" aria-label="重做">↪️ 重做</button>
                     <button class="tool-button" id="clearAllTool" aria-label="清除全部">🗑️ 清除全部</button>
+                    <button class="tool-button" id="downloadPDFTool" aria-label="下載PDF">📥 下載PDF</button>
+                    <progress id="downloadProgress" value="0" max="100" style="display: none;"></progress>
                 </div>
             </div>
         </div>
         <div class="content-container">
-            <div class="sidebar">
+            <div id="sidebarToggle" class="sidebar-toggle" aria-label="收縮或展開側邊欄">
+                <span class="toggle-icon">◀</span>
+            </div>
+            <div id="sidebar" class="sidebar">
                 <div id="thumbnailContainer"></div>
             </div>
             <div class="main-content">
@@ -106,5 +116,11 @@
     <script src="drawingTools.js"></script>
     <script src="pdfHandler.js"></script>
     <script src="app.js"></script>
+    <script src="https://unpkg.com/pdf-lib@1.4.0"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.9.359/pdf.min.js"></script>
+    <script src="https://unpkg.com/pdf-lib@1.17.1"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.5/FileSaver.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf-lib/1.17.1/pdf-lib.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 </body>
 </html>
