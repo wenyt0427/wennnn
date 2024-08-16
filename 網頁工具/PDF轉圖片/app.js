@@ -52,10 +52,15 @@ const PDFApp = (function(utils, drawingTools, pdfHandler) {
         };
 
         document.querySelectorAll('.tool-button').forEach(button => {
-            button.addEventListener('click', (e) => {
-                const tool = e.target.id.replace('Tool', '');
-                switchTool(tool);
-            });
+            if (['undoTool', 'redoTool', 'clearAllTool'].includes(button.id)) {
+                // 對於撤銷、重做和清除全部按鈕，使用單獨的事件處理
+                button.addEventListener('click', handleFunctionButton);
+            } else {
+                button.addEventListener('click', (e) => {
+                    const tool = e.target.id.replace('Tool', '');
+                    switchTool(tool);
+                });
+            }
         });
 
         document.querySelectorAll('.shape-button').forEach(button => {
@@ -110,10 +115,6 @@ const PDFApp = (function(utils, drawingTools, pdfHandler) {
             }
         });
 
-        document.getElementById('undoTool').addEventListener('click', drawingTools.undo);
-        document.getElementById('redoTool').addEventListener('click', drawingTools.redo);
-        document.getElementById('clearAllTool').addEventListener('click', drawingTools.clearAll);
-
         sidebarToggleElement.addEventListener('click', toggleSidebar);
 
         pdfViewerElement.addEventListener('scroll', handleScroll);
@@ -154,6 +155,9 @@ const PDFApp = (function(utils, drawingTools, pdfHandler) {
         } else if (e.ctrlKey && e.key === 'y') {
             e.preventDefault();
             drawingTools.redo();
+        } else if (e.ctrlKey && e.key === 'Delete') {
+            e.preventDefault();
+            drawingTools.clearAll();
         } else if (e.key === 'ArrowLeft') {
             e.preventDefault();
             pdfHandler.navigatePage(-1);
@@ -161,6 +165,23 @@ const PDFApp = (function(utils, drawingTools, pdfHandler) {
             e.preventDefault();
             pdfHandler.navigatePage(1);
         }
+    }
+
+    function handleFunctionButton(e) {
+        switch (e.target.id) {
+            case 'undoTool':
+                drawingTools.undo();
+                break;
+            case 'redoTool':
+                drawingTools.redo();
+                break;
+            case 'clearAllTool':
+                drawingTools.clearAll();
+                break;
+        }
+        // 防止這些按鈕被選中為當前工具
+        e.preventDefault();
+        e.stopPropagation();
     }
 
     function updateColorIndicator(tool) {
