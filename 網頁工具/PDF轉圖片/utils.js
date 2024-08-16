@@ -42,7 +42,8 @@ const Utils = {
             pencil: '鉛筆',
             highlighter: '螢光筆',
             eraser: '橡皮擦',
-            shape: '形狀'
+            shape: '形狀',
+            downloadPDF: '下載PDF'
         };
         return toolNames[tool] || tool;
     },
