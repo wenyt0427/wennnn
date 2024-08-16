@@ -4,14 +4,21 @@ const PDFApp = (function(utils, drawingTools, pdfHandler) {
     let pdfViewerElement;
     let thumbnailContainerElement;
     let scrollThrottle;
+    let sidebarElement;
+    let mainContentElement;
+    let sidebarToggleElement;
 
     function init() {
         const dropZone = document.getElementById('dropZone');
         const fileInput = document.getElementById('fileInput');
         const toggleButtons = document.getElementById('toggleButtons');
         const reuploadButton = document.getElementById('reuploadButton');
+        const downloadPDFButton = document.getElementById('downloadPDFTool');
         pdfViewerElement = document.getElementById('pdfViewer');
         thumbnailContainerElement = document.getElementById('thumbnailContainer');
+        sidebarElement = document.getElementById('sidebar');
+        mainContentElement = document.querySelector('.main-content');
+        sidebarToggleElement = document.getElementById('sidebarToggle');
 
         adjustContentHeight();
         window.addEventListener('resize', adjustContentHeight);
@@ -37,6 +44,7 @@ const PDFApp = (function(utils, drawingTools, pdfHandler) {
             }
         };
         toggleButtons.onclick = togglePageButtons;
+        downloadPDFButton.onclick = pdfHandler.downloadPDF;
 
         reuploadButton.onclick = () => {
             document.getElementById('dropZone').style.display = 'flex';
@@ -46,18 +54,7 @@ const PDFApp = (function(utils, drawingTools, pdfHandler) {
         document.querySelectorAll('.tool-button').forEach(button => {
             button.addEventListener('click', (e) => {
                 const tool = e.target.id.replace('Tool', '');
-                if (tool !== 'undo' && tool !== 'redo' && tool !== 'clearAll') {
-                    drawingTools.setCurrentTool(tool);
-                    document.querySelectorAll('.tool-button').forEach(btn => btn.classList.remove('active'));
-                    e.target.classList.add('active');
-                    drawingTools.updateCursor();
-                } else if (tool === 'undo') {
-                    drawingTools.undo();
-                } else if (tool === 'redo') {
-                    drawingTools.redo();
-                } else if (tool === 'clearAll') {
-                    drawingTools.clearAll();
-                }
+                switchTool(tool);
             });
         });
 
@@ -65,6 +62,7 @@ const PDFApp = (function(utils, drawingTools, pdfHandler) {
             button.addEventListener('click', (e) => {
                 const shape = e.target.dataset.shape;
                 drawingTools.setCurrentShape(shape);
+                switchTool('shape');
             });
         });
 
@@ -77,6 +75,7 @@ const PDFApp = (function(utils, drawingTools, pdfHandler) {
                 sizeInput.addEventListener('input', () => {
                     drawingTools.updateCursor();
                     utils.updateSizeDisplay(tool);
+                    switchTool(tool);
                 });
                 utils.updateSizeDisplay(tool);
             }
@@ -86,6 +85,7 @@ const PDFApp = (function(utils, drawingTools, pdfHandler) {
         if (highlighterOpacity) {
             highlighterOpacity.addEventListener('input', () => {
                 utils.updateOpacityDisplay('highlighter');
+                switchTool('highlighter');
             });
             utils.updateOpacityDisplay('highlighter');
         }
@@ -94,6 +94,7 @@ const PDFApp = (function(utils, drawingTools, pdfHandler) {
         if (shapeOpacity) {
             shapeOpacity.addEventListener('input', () => {
                 utils.updateOpacityDisplay('shape');
+                switchTool('shape');
             });
             utils.updateOpacityDisplay('shape');
         }
@@ -101,113 +102,109 @@ const PDFApp = (function(utils, drawingTools, pdfHandler) {
         ['pencil', 'highlighter', 'shape'].forEach(tool => {
             const colorInput = document.getElementById(`${tool}Color`);
             if (colorInput) {
-                colorInput.addEventListener('change', drawingTools.updateCursor);
+                colorInput.addEventListener('change', () => {
+                    updateColorIndicator(tool);
+                    switchTool(tool);
+                });
+                updateColorIndicator(tool);
             }
         });
 
-        window.addEventListener('load', () => {
-            utils.showNotification('PDF轉圖片工具已加載完成，可以開始使用了');
-        });
+        document.getElementById('undoTool').addEventListener('click', drawingTools.undo);
+        document.getElementById('redoTool').addEventListener('click', drawingTools.redo);
+        document.getElementById('clearAllTool').addEventListener('click', drawingTools.clearAll);
 
-        window.addEventListener('error', (e) => {
-            console.error('發生錯誤:', e.error);
-            utils.showNotification('抱歉，發生了一個錯誤。請刷新頁面或聯繫支持。');
-        });
-
-        thumbnailContainerElement.addEventListener('click', (e) => {
-            if (e.target.classList.contains('thumbnail')) {
-                const pageNum = parseInt(e.target.dataset.pageNum);
-                scrollToPage(pageNum);
-            }
-        });
+        sidebarToggleElement.addEventListener('click', toggleSidebar);
 
         pdfViewerElement.addEventListener('scroll', handleScroll);
     }
 
-    function togglePageButtons() {
-        buttonsVisible = !buttonsVisible;
-        document.getElementById('toggleButtons').textContent = buttonsVisible ? '👁️' : '👁️‍🗨️';
-        document.getElementById('toggleButtons').setAttribute('aria-label', buttonsVisible ? '隱藏頁面按鈕' : '顯示頁面按鈕');
-        const pageButtons = document.querySelectorAll('.page-buttons');
-        const pageNumbers = document.querySelectorAll('.page-number');
-        pageButtons.forEach(buttonContainer => {
-            buttonContainer.style.display = buttonsVisible ? 'flex' : 'none';
-        });
-        pageNumbers.forEach(pageNumber => {
-            pageNumber.style.display = buttonsVisible ? 'block' : 'none';
-        });
-        utils.showNotification(buttonsVisible ? '已顯示頁面按鈕' : '已隱藏頁面按鈕');
-    }
-
-    function handleKeyboardShortcuts(e) {
-        if (e.key === 'ArrowLeft') {
-            pdfHandler.navigatePage(-1);
-        } else if (e.key === 'ArrowRight') {
-            pdfHandler.navigatePage(1);
-        } else if (e.ctrlKey && (e.key === 'z' || e.key === 'Z')) {
-            e.preventDefault();
-            drawingTools.undo();
-        } else if (e.ctrlKey && (e.key === 'y' || e.key === 'Y')) {
-            e.preventDefault();
-            drawingTools.redo();
+    function adjustContentHeight() {
+        const topToolbar = document.querySelector('.top-toolbar');
+        const contentContainer = document.querySelector('.content-container');
+        if (topToolbar && contentContainer) {
+            const toolbarHeight = topToolbar.offsetHeight;
+            contentContainer.style.height = `calc(100vh - ${toolbarHeight}px)`;
         }
     }
 
-    function scrollToPage(pageNum) {
-        pdfHandler.scrollToPage(pageNum);
+    function togglePageButtons() {
+        buttonsVisible = !buttonsVisible;
+        const pageButtons = document.querySelectorAll('.page-buttons');
+        pageButtons.forEach(buttons => {
+            buttons.style.display = buttonsVisible ? 'flex' : 'none';
+        });
+        document.getElementById('toggleButtons').textContent = buttonsVisible ? '👁️' : '👁️‍🗨️';
+    }
+
+    function switchTool(tool) {
+        drawingTools.setCurrentTool(tool);
+        updateToolState();
+    }
+
+    function updateToolState() {
+        const toolState = drawingTools.updateToolState();
+        console.log('Current tool state:', toolState);
+    }
+
+    function handleKeyboardShortcuts(e) {
+        if (e.ctrlKey && e.key === 'z') {
+            e.preventDefault();
+            drawingTools.undo();
+        } else if (e.ctrlKey && e.key === 'y') {
+            e.preventDefault();
+            drawingTools.redo();
+        } else if (e.key === 'ArrowLeft') {
+            e.preventDefault();
+            pdfHandler.navigatePage(-1);
+        } else if (e.key === 'ArrowRight') {
+            e.preventDefault();
+            pdfHandler.navigatePage(1);
+        }
+    }
+
+    function updateColorIndicator(tool) {
+        const toolButton = document.getElementById(`${tool}Tool`);
+        const colorInput = document.getElementById(`${tool}Color`);
+        if (toolButton && colorInput) {
+            toolButton.style.setProperty('--indicator-color', colorInput.value);
+        }
     }
 
     function handleScroll() {
         if (scrollThrottle) {
-            return;
+            clearTimeout(scrollThrottle);
         }
-
         scrollThrottle = setTimeout(() => {
             const pageContainers = pdfViewerElement.querySelectorAll('.page-container');
-            const viewerRect = pdfViewerElement.getBoundingClientRect();
-            let maxVisibleRatio = 0;
-            let mostVisiblePage = null;
+            let closestPage = null;
+            let closestDistance = Infinity;
 
             pageContainers.forEach(container => {
                 const rect = container.getBoundingClientRect();
-                const visibleHeight = Math.min(rect.bottom, viewerRect.bottom) - Math.max(rect.top, viewerRect.top);
-                const visibleRatio = visibleHeight / rect.height;
-
-                if (visibleRatio > maxVisibleRatio) {
-                    maxVisibleRatio = visibleRatio;
-                    mostVisiblePage = container;
+                const distance = Math.abs(rect.top);
+                if (distance < closestDistance) {
+                    closestDistance = distance;
+                    closestPage = container;
                 }
             });
 
-            if (mostVisiblePage && maxVisibleRatio > 0.5) {
-                const pageNum = parseInt(mostVisiblePage.id.split('-')[2]);
-                updateActivePage(pageNum);
+            if (closestPage) {
+                const pageNum = parseInt(closestPage.id.replace('page-container-', ''));
+                pdfHandler.setActivePage(pageNum, false);
             }
-
-            scrollThrottle = null;
         }, 100);
     }
 
-    function updateActivePage(pageNum) {
-        if (currentPage !== pageNum) {
-            currentPage = pageNum;
-            pdfHandler.setActivePage(pageNum, false);
-        }
-    }
-
-    function adjustContentHeight() {
-        const topToolbar = document.getElementById('topToolbar');
-        const contentContainer = document.querySelector('.content-container');
-        const windowHeight = window.innerHeight;
-        const toolbarHeight = topToolbar.offsetHeight;
-        contentContainer.style.height = `${windowHeight - toolbarHeight}px`;
+    function toggleSidebar() {
+        sidebarElement.classList.toggle('collapsed');
+        mainContentElement.classList.toggle('expanded');
+        const toggleIcon = sidebarToggleElement.querySelector('.toggle-icon');
+        toggleIcon.textContent = sidebarElement.classList.contains('collapsed') ? '▶' : '◀';
     }
 
     return {
-        init: init,
-        scrollToPage: scrollToPage,
-        adjustContentHeight: adjustContentHeight,
-        updateActivePage: updateActivePage
+        init: init
     };
 })(Utils, DrawingTools, PDFHandler);
 
