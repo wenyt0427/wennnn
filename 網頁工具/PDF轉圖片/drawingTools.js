@@ -272,8 +272,8 @@ const DrawingTools = (function(utils) {
             case 'highlighter':
                 return parseInt(document.getElementById('highlighterOpacity')?.value || '50') / 100;
             case 'shape':
-                if (currentShape === 'line' || currentShape === 'arrow') {
-                    return 1; // 直線和箭頭始終使用100%不透明度
+                if (currentShape === 'arrow') {
+                    return 1; // 箭頭保持100%不透明度
                 }
                 return parseInt(document.getElementById('shapeOpacity')?.value || '100') / 100;
             default:
@@ -314,7 +314,6 @@ const DrawingTools = (function(utils) {
                 }
                 break;
             case 'line':
-                ctx.globalAlpha = 1; // 確保直線始終是100%不透明
                 ctx.moveTo(startX, startY);
                 ctx.lineTo(endX, endY);
                 ctx.stroke();
