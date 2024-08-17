@@ -53,7 +53,6 @@ const PDFApp = (function(utils, drawingTools, pdfHandler) {
 
         document.querySelectorAll('.tool-button').forEach(button => {
             if (['undoTool', 'redoTool', 'clearAllTool'].includes(button.id)) {
-                // 對於撤銷、重做和清除全部按鈕，使用單獨的事件處理
                 button.addEventListener('click', handleFunctionButton);
             } else {
                 button.addEventListener('click', (e) => {
@@ -118,6 +117,12 @@ const PDFApp = (function(utils, drawingTools, pdfHandler) {
         sidebarToggleElement.addEventListener('click', toggleSidebar);
 
         pdfViewerElement.addEventListener('scroll', handleScroll);
+
+        // 監聽全局的滾輪事件，用於處理縮放
+        document.addEventListener('wheel', handleGlobalWheel, { passive: false });
+
+        // 監聽全局的鼠標事件，用於處理拖動
+        document.addEventListener('mousedown', handleGlobalMouseDown);
     }
 
     function adjustContentHeight() {
@@ -179,7 +184,6 @@ const PDFApp = (function(utils, drawingTools, pdfHandler) {
                 drawingTools.clearAll();
                 break;
         }
-        // 防止這些按鈕被選中為當前工具
         e.preventDefault();
         e.stopPropagation();
     }
@@ -222,6 +226,29 @@ const PDFApp = (function(utils, drawingTools, pdfHandler) {
         mainContentElement.classList.toggle('expanded');
         const toggleIcon = sidebarToggleElement.querySelector('.toggle-icon');
         toggleIcon.textContent = sidebarElement.classList.contains('collapsed') ? '▶' : '◀';
+    }
+
+    function handleGlobalWheel(e) {
+        if (e.ctrlKey) {
+            e.preventDefault(); // 防止頁面縮放
+            const pageContainer = e.target.closest('.page-container');
+            if (pageContainer) {
+                const pageNum = parseInt(pageContainer.id.replace('page-container-', ''));
+                const delta = e.deltaY > 0 ? -0.1 : 0.1;
+                pdfHandler.zoomPage(pageNum, delta);
+            }
+        }
+    }
+
+    function handleGlobalMouseDown(e) {
+        if (e.ctrlKey) {
+            const pageContainer = e.target.closest('.page-container');
+            if (pageContainer) {
+                e.preventDefault();
+                const pageNum = parseInt(pageContainer.id.replace('page-container-', ''));
+                pdfHandler.handlePageDrag(e, pageNum);
+            }
+        }
     }
 
     return {
