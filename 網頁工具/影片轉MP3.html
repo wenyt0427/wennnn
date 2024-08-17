@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>影片轉 MP3 工具</title>
+    <title>影片轉音頻工具</title>
     <style>
         body {
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
@@ -192,7 +192,7 @@
 <body>
     <button id="homeButton" onclick="window.location.href='https://wenyt0427.github.io/wennnn/%E7%B6%B2%E9%A0%81%E5%B7%A5%E5%85%B7/%E4%B8%BB%E9%A0%81%E9%9D%A2'">🏠</button>
     <div class="container">
-        <h1>影片轉 MP3 工具</h1>
+        <h1>影片轉音頻工具</h1>
         <div class="input-group">
             <input type="file" id="fileInput" accept="video/mp4,video/quicktime">
             <label for="fileInput">選擇 MP4 或 MOV 文件</label>
@@ -203,6 +203,16 @@
                     <div id="fileSize" class="file-size"></div>
                 </div>
             </div>
+        </div>
+        <div class="input-group">
+            <select id="audioFormat">
+                <option value="mp3">MP3</option>
+                <option value="wav">WAV</option>
+                <option value="aac">AAC</option>
+                <option value="ogg">OGG</option>
+                <option value="flac">FLAC</option>
+                <option value="m4a">M4A</option>
+            </select>
         </div>
         <div class="input-group">
             <select id="quality">
@@ -217,7 +227,7 @@
         </div>
         <div class="input-group button-group">
             <button id="reconvertBtn">重新轉換</button>
-            <button id="downloadBtn">下載 MP3</button>
+            <button id="downloadBtn">下載音頻</button>
         </div>
         <audio id="audioPlayer" controls></audio>
         <div id="waveformContainer">
@@ -239,6 +249,7 @@
         const fileInput = document.getElementById('fileInput');
         const downloadBtn = document.getElementById('downloadBtn');
         const reconvertBtn = document.getElementById('reconvertBtn');
+        const audioFormatSelect = document.getElementById('audioFormat');
         const qualitySelect = document.getElementById('quality');
         const fileNameInput = document.getElementById('fileNameInput');
         const status = document.getElementById('status');
@@ -305,10 +316,11 @@
             if (!convertedBlob) return;
 
             const fileName = fileNameInput.value.trim() || 'converted';
+            const format = audioFormatSelect.value;
             const url = URL.createObjectURL(convertedBlob);
             const a = document.createElement('a');
             a.href = url;
-            a.download = `${fileName}.mp3`;
+            a.download = `${fileName}.${format}`;
             a.click();
             URL.revokeObjectURL(url);
         });
@@ -358,10 +370,14 @@
             try {
                 const audioBuffer = await extractAudio(selectedFile);
                 if (conversionCancelled || thisConversionId !== currentConversionId) return;
-                convertedBlob = await encodeMp3(audioBuffer, parseInt(qualitySelect.value), thisConversionId);
+                
+                const format = audioFormatSelect.value;
+                const quality = parseInt(qualitySelect.value);
+                
+                convertedBlob = await encodeAudio(audioBuffer, format, quality, thisConversionId);
                 if (conversionCancelled || thisConversionId !== currentConversionId) return;
                 
-                status.textContent = '轉換完成！您可以試聽或下載 MP3 文件。';
+                status.textContent = '轉換完成！您可以試聽或下載音頻文件。';
                 downloadBtn.style.display = 'block';
                 reconvertBtn.style.display = 'block';
                 
@@ -380,7 +396,7 @@
                 if (error.message === 'Conversion cancelled') {
                     status.textContent = '轉換已取消';
                 } else {
-                    status.textContent = `轉換失敗: ${error.message}`;
+                                    status.textContent = `轉換失敗: ${error.message}`;
                 }
                 reconvertBtn.style.display = 'block';
             } finally {
@@ -396,44 +412,98 @@
             try {
                 const audioContext = new (window.AudioContext || window.webkitAudioContext)();
                 const arrayBuffer = await file.arrayBuffer();
-                                return await audioContext.decodeAudioData(arrayBuffer);
+                return await audioContext.decodeAudioData(arrayBuffer);
             } catch (error) {
                 console.error('Audio extraction error:', error);
                 throw new Error('無法提取音頻。請嘗試使用不同的文件格式或瀏覽器。');
             }
         }
 
-        async function encodeMp3(audioBuffer, kbps, conversionId) {
+        async function encodeAudio(audioBuffer, format, kbps, conversionId) {
             try {
                 const sampleRate = audioBuffer.sampleRate;
+                const channels = audioBuffer.numberOfChannels;
                 const samples = audioBuffer.getChannelData(0);
-                const mp3encoder = new lamejs.Mp3Encoder(1, sampleRate, kbps);
-                const mp3Data = [];
 
-                const sampleBlockSize = 1152;
-                const totalSamples = samples.length;
-                
-                for (let i = 0; i < totalSamples; i += sampleBlockSize) {
-                    if (conversionCancelled || conversionId !== currentConversionId) throw new Error('Conversion cancelled');
-                    const sampleChunk = samples.subarray(i, i + sampleBlockSize);
-                    const int16SampleChunk = convertFloat32ToInt16(sampleChunk);
-                    const mp3buf = mp3encoder.encodeBuffer(int16SampleChunk);
-                    if (mp3buf.length > 0) {
-                        mp3Data.push(new Int8Array(mp3buf));
-                    }
-                    updateProgress(i / totalSamples);
-                    await new Promise(resolve => setTimeout(resolve, 0));
+                switch (format) {
+                    case 'mp3':
+                        return await encodeMp3(samples, channels, sampleRate, kbps, conversionId);
+                    case 'wav':
+                        return encodeWav(samples, channels, sampleRate);
+                    case 'aac':
+                    case 'ogg':
+                    case 'flac':
+                    case 'm4a':
+                        throw new Error(`${format.toUpperCase()} 格式暫不支持。請選擇 MP3 或 WAV 格式。`);
+                    default:
+                        throw new Error('不支持的音頻格式');
                 }
-                
-                const mp3buf = mp3encoder.flush();
+            } catch (error) {
+                console.error('Audio encoding error:', error);
+                throw new Error(`音頻編碼失敗：${error.message}`);
+            }
+        }
+
+        async function encodeMp3(samples, channels, sampleRate, kbps, conversionId) {
+            const mp3encoder = new lamejs.Mp3Encoder(channels, sampleRate, kbps);
+            const mp3Data = [];
+
+            const sampleBlockSize = 1152;
+            const totalSamples = samples.length;
+            
+            for (let i = 0; i < totalSamples; i += sampleBlockSize) {
+                if (conversionCancelled || conversionId !== currentConversionId) throw new Error('Conversion cancelled');
+                const sampleChunk = samples.subarray(i, i + sampleBlockSize);
+                const int16SampleChunk = convertFloat32ToInt16(sampleChunk);
+                const mp3buf = mp3encoder.encodeBuffer(int16SampleChunk);
                 if (mp3buf.length > 0) {
                     mp3Data.push(new Int8Array(mp3buf));
                 }
-                
-                return new Blob(mp3Data, { type: 'audio/mp3' });
-            } catch (error) {
-                console.error('MP3 encoding error:', error);
-                throw new Error('MP3 編碼失敗。請嘗試較低的比特率或較小的文件。');
+                updateProgress(i / totalSamples);
+                await new Promise(resolve => setTimeout(resolve, 0));
+            }
+            
+            const mp3buf = mp3encoder.flush();
+            if (mp3buf.length > 0) {
+                mp3Data.push(new Int8Array(mp3buf));
+            }
+            
+            return new Blob(mp3Data, { type: 'audio/mp3' });
+        }
+
+        function encodeWav(samples, channels, sampleRate) {
+            const buffer = new ArrayBuffer(44 + samples.length * 2);
+            const view = new DataView(buffer);
+
+            // WAV Header
+            writeString(view, 0, 'RIFF');
+            view.setUint32(4, 36 + samples.length * 2, true);
+            writeString(view, 8, 'WAVE');
+            writeString(view, 12, 'fmt ');
+            view.setUint32(16, 16, true);
+            view.setUint16(20, 1, true);
+            view.setUint16(22, channels, true);
+            view.setUint32(24, sampleRate, true);
+            view.setUint32(28, sampleRate * 2, true);
+            view.setUint16(32, 2, true);
+            view.setUint16(34, 16, true);
+            writeString(view, 36, 'data');
+            view.setUint32(40, samples.length * 2, true);
+
+            // Write samples
+            const length = samples.length;
+            let index = 44;
+            for (let i = 0; i < length; i++) {
+                view.setInt16(index, samples[i] * 32767, true);
+                index += 2;
+            }
+
+            return new Blob([buffer], { type: 'audio/wav' });
+        }
+
+        function writeString(view, offset, string) {
+            for (let i = 0; i < string.length; i++) {
+                view.setUint8(offset + i, string.charCodeAt(i));
             }
         }
 
