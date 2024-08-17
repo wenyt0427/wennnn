@@ -12,6 +12,8 @@ const DrawingTools = (function(utils) {
     let currentPage = 1;
     let tempCanvas = null;
     let colorPalettesInitialized = false;
+    let currentScale = 1;
+    let previousTool = 'mouse'; // 新增：用於存儲拖動前的工具
 
     function setCurrentTool(tool) {
         currentTool = tool;
@@ -129,13 +131,14 @@ const DrawingTools = (function(utils) {
 
     function startDrawing(e) {
         if (currentTool === 'mouse') return;
+        if (e.ctrlKey) return; // 如果按住Ctrl鍵，不開始繪製
         isDrawing = true;
         [startX, startY] = getCanvasMousePosition(e.target, e);
         [lastX, lastY] = [startX, startY];
         currentStroke = {
             tool: currentTool,
             color: getToolColor(),
-            lineWidth: getToolSize(),
+            lineWidth: getToolSize() / currentScale,
             opacity: getToolOpacity(),
             points: [{x: startX, y: startY}]
         };
@@ -153,7 +156,7 @@ const DrawingTools = (function(utils) {
     }
 
     function draw(e) {
-        if (!isDrawing || currentTool === 'mouse') return;
+        if (!isDrawing || currentTool === 'mouse' || e.ctrlKey) return;
 
         const canvas = e.target;
         const ctx = canvas.getContext('2d');
@@ -392,10 +395,10 @@ const DrawingTools = (function(utils) {
                 drawShape(ctx, stroke.points[0].x, stroke.points[0].y, stroke.endX, stroke.endY, stroke);
             } else if (stroke.tool === 'eraser') {
                 for (let i = 1; i < stroke.points.length; i++) {
-                    applyEraser(ctx, stroke.points[i-1].x, stroke.points[i-1].y, 
+                                        applyEraser(ctx, stroke.points[i-1].x, stroke.points[i-1].y, 
                                 stroke.points[i].x, stroke.points[i].y, stroke.lineWidth);
                 }
-                        } else {
+            } else {
                 applyDrawingStyle(ctx, stroke);
                 ctx.beginPath();
                 ctx.moveTo(stroke.points[0].x, stroke.points[0].y);
@@ -478,7 +481,7 @@ const DrawingTools = (function(utils) {
         if (!eraserCursor) return;
 
         if (currentTool === 'eraser') {
-            const eraserSize = getToolSize();
+            const eraserSize = getToolSize() / currentScale;
             const canvas = e.target.closest('.drawing-canvas');
             if (!canvas) return;
 
@@ -614,6 +617,26 @@ const DrawingTools = (function(utils) {
         return drawingHistories.get(pageNum) || [];
     }
 
+    function setScale(scale) {
+        currentScale = scale;
+    }
+
+    // 新增：切換到鼠標工具並保存先前的工具
+    function switchToMouseTool() {
+        if (currentTool !== 'mouse') {
+            previousTool = currentTool;
+            setCurrentTool('mouse');
+        }
+    }
+
+    // 新增：恢復到先前的工具
+    function restorePreviousTool() {
+        if (previousTool && previousTool !== 'mouse') {
+            setCurrentTool(previousTool);
+            previousTool = 'mouse';
+        }
+    }
+
     return {
         setCurrentTool: setCurrentTool,
         setCurrentShape: setCurrentShape,
@@ -626,6 +649,9 @@ const DrawingTools = (function(utils) {
         redo: redo,
         clearAll: clearAll,
         updateToolState: updateToolState,
-        getDrawingHistoryForPage: getDrawingHistoryForPage
+        getDrawingHistoryForPage: getDrawingHistoryForPage,
+        setScale: setScale,
+        switchToMouseTool: switchToMouseTool,
+        restorePreviousTool: restorePreviousTool
     };
 })(Utils);
