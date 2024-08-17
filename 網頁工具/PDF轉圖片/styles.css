@@ -123,6 +123,7 @@ body {
     margin-bottom: 20px;
     background-color: rgba(255, 255, 255, 0.8);
     border: 1px solid #ccc;
+    overflow: hidden;
 }
 
 .page-buttons {
@@ -131,6 +132,7 @@ body {
     right: 10px;
     display: flex;
     gap: 5px;
+    align-items: center;
 }
 
 .page-button {
@@ -339,4 +341,22 @@ canvas {
     width: 200px;
     height: 20px;
     margin-left: 10px;
+}
+
+.page-content {
+    position: relative;
+    transition: transform 0.3s ease;
+}
+
+.page-container.zoomed .page-content {
+    cursor: grab;
+}
+
+.page-container.zoomed.dragging .page-content {
+    cursor: grabbing;
+}
+
+.zoom-indicator {
+    margin-right: 10px;
+    font-weight: bold;
 }
