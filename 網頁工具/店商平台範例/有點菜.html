@@ -1,0 +1,211 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>有點菜 - 新鮮火星農產品直送</title>
+    <link rel="stylesheet" href="styles.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.3/css/all.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;700&display=swap" rel="stylesheet">
+</head>
+<body>
+    <div class="banner-container">
+        <a href="https://wenyt0427.github.io/wennnn/%E7%B6%B2%E9%A0%81%E5%B7%A5%E5%85%B7/%E4%B8%BB%E9%A0%81%E9%9D%A2" class="home-button" title="回到首頁">🏠</a>
+        <img src="有點菜橫幅.jpg" alt="有點菜橫幅" class="banner">
+        <div class="banner-text">
+            <h1>有點菜</h1>
+            <p>新鮮火星農產品直送到您家</p>
+        </div>
+    </div>
+
+    <nav>
+        <ul>
+            <li><a href="#home">首頁</a></li>
+            <li><a href="#products">產品</a></li>
+            <li><a href="#reviews">客戶評價</a></li>
+            <li><a href="#about">關於我們</a></li>
+            <li><a href="#contact">聯絡我們</a></li>
+        </ul>
+    </nav>
+
+    <div class="container">
+        <section id="home">
+            <h2>歡迎來到有點菜</h2>
+            <p>我們提供最新鮮的火星當季農產品，直接從火星農場送到您的餐桌。</p>
+        </section>
+
+        <section id="products">
+            <h2>我們的產品</h2>
+            <div class="products">
+                <div class="product">
+                    <img src="火星高麗菜.jpg" alt="火星高麗菜">
+                    <div class="product-controls">
+                        <span class="product-name">火星高麗菜</span>
+                        <span class="product-price">Star 40</span>
+                        <div class="quantity-control">
+                            <button onclick="changeQuantity('火星高麗菜', -1)">-</button>
+                            <span class="quantity-display" id="火星高麗菜-quantity">0</span>
+                            <button onclick="changeQuantity('火星高麗菜', 1)">+</button>
+                        </div>
+                        <button class="add-to-cart" onclick="addToCart('火星高麗菜', 40)">加入購物車</button>
+                    </div>
+                </div>
+                <div class="product">
+                    <img src="火星青江菜.jpg" alt="火星青江菜">
+                    <div class="product-controls">
+                        <span class="product-name">火星青江菜</span>
+                        <span class="product-price">Star 60</span>
+                        <div class="quantity-control">
+                            <button onclick="changeQuantity('火星青江菜', -1)">-</button>
+                            <span class="quantity-display" id="火星青江菜-quantity">0</span>
+                            <button onclick="changeQuantity('火星青江菜', 1)">+</button>
+                        </div>
+                        <button class="add-to-cart" onclick="addToCart('火星青江菜', 60)">加入購物車</button>
+                    </div>
+                </div>
+                <div class="product">
+                    <img src="火星木瓜.jpg" alt="火星木瓜">
+                    <div class="product-controls">
+                        <span class="product-name">火星木瓜</span>
+                        <span class="product-price">Star 100</span>
+                        <div class="quantity-control">
+                            <button onclick="changeQuantity('火星木瓜', -1)">-</button>
+                            <span class="quantity-display" id="火星木瓜-quantity">0</span>
+                            <button onclick="changeQuantity('火星木瓜', 1)">+</button>
+                        </div>
+                        <button class="add-to-cart" onclick="addToCart('火星木瓜', 100)">加入購物車</button>
+                    </div>
+                </div>
+                <div class="product">
+                    <img src="火星番茄.jpg" alt="火星番茄">
+                    <div class="product-controls">
+                        <span class="product-name">火星番茄</span>
+                        <span class="product-price">Star 60</span>
+                        <div class="quantity-control">
+                            <button onclick="changeQuantity('火星番茄', -1)">-</button>
+                            <span class="quantity-display" id="火星番茄-quantity">0</span>
+                            <button onclick="changeQuantity('火星番茄', 1)">+</button>
+                        </div>
+                        <button class="add-to-cart" onclick="addToCart('火星番茄', 60)">加入購物車</button>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <section id="reviews">
+            <h2>客戶評價</h2>
+            <div class="reviews-container">
+                <button class="review-arrow left" onclick="changeReview(-1)">
+                    <i class="fas fa-chevron-left"></i>
+                </button>
+                <div class="reviews-carousel">
+                    <div class="review">
+                        <img src="陳x婷.jpg" alt="客戶頭像" class="avatar">
+                        <div class="review-content">
+                            <div class="stars">
+                                <i class="fas fa-star"></i>
+                                <i class="fas fa-star"></i>
+                                <i class="fas fa-star"></i>
+                                <i class="fas fa-star"></i>
+                                <i class="fas fa-star"></i>
+                            </div>
+                            <p>火星高麗菜真的超級新鮮！口感脆嫩，完全不輸地球上的高麗菜。強烈推薦！</p>
+                            <span class="reviewer-name">- 陳x婷</span>
+                        </div>
+                    </div>
+                    <div class="review">
+                        <img src="劉x軍.jpg" alt="客戶頭像" class="avatar">
+                        <div class="review-content">
+                            <div class="stars">
+                                <i class="fas fa-star"></i>
+                                <i class="fas fa-star"></i>
+                                <i class="fas fa-star"></i>
+                                <i class="fas fa-star"></i>
+                                <i class="far fa-star"></i>
+                            </div>
+                            <p>火星青江菜的口感獨特，帶有一絲火星土壤的香氣，非常特別的體驗！</p>
+                            <span class="reviewer-name">- 劉x軍</span>
+                        </div>
+                    </div>
+                    <div class="review">
+                        <img src="林x華.jpg" alt="客戶頭像" class="avatar">
+                        <div class="review-content">
+                            <div class="stars">
+                                <i class="fas fa-star"></i>
+                                <i class="fas fa-star"></i>
+                                <i class="fas fa-star"></i>
+                                <i class="fas fa-star"></i>
+                                <i class="fas fa-star-half-alt"></i>
+                            </div>
+                            <p>火星木瓜甜度適中，果肉細膩。唯一的缺點是價格稍高，但品質絕對值得！</p>
+                            <span class="reviewer-name">- 林x華</span>
+                        </div>
+                    </div>
+                    <div class="review">
+                        <img src="王x強.jpg" alt="客戶頭像" class="avatar">
+                        <div class="review-content">
+                            <div class="stars">
+                                <i class="fas fa-star"></i>
+                                <i class="fas fa-star"></i>
+                                <i class="fas fa-star"></i>
+                                <i class="fas fa-star"></i>
+                                <i class="fas fa-star"></i>
+                            </div>
+                            <p>火星番茄的酸甜比例恰到好處，做沙拉或直接生吃都非常美味。會再回購！</p>
+                            <span class="reviewer-name">- 王x強</span>
+                        </div>
+                    </div>
+                    <div class="review">
+                        <img src="蔡x玲.jpg" alt="客戶頭像" class="avatar">
+                        <div class="review-content">
+                            <div class="stars">
+                                <i class="fas fa-star"></i>
+                                <i class="fas fa-star"></i>
+                                <i class="fas fa-star"></i>
+                                <i class="fas fa-star"></i>
+                                <i class="far fa-star"></i>
+                            </div>
+                            <p>整體而言，有點菜的服務很好，配送迅速。期待未來能有更多火星特色蔬果！</p>
+                            <span class="reviewer-name">- 蔡x玲</span>
+                        </div>
+                    </div>
+                </div>
+                <button class="review-arrow right" onclick="changeReview(1)">
+                    <i class="fas fa-chevron-right"></i>
+                </button>
+            </div>
+        </section>
+
+        <section id="about">
+            <h2>關於我們</h2>
+            <p>有點菜是一家致力於提供優質火星農產品的公司。我們與火星當地農民合作，確保每一件產品都是最新鮮、最優質的。</p>
+        </section>
+
+        <section id="contact">
+            <h2>聯絡我們</h2>
+            <p>地址: 火星市 紅岩區 星際大道12路 8巷</p>
+            <p>電話: 無</p>
+            <p>Email: info@youdiancai.com</p>
+        </section>
+    </div>
+
+    <div id="floating-cart" onclick="toggleCart()">
+        <i class="fas fa-shopping-cart"></i>
+        <span id="cart-count">0</span>
+    </div>
+
+    <div id="cart-sidebar">
+        <h2>購物車 <span id="close-cart" onclick="toggleCart()">×</span></h2>
+        <div id="cart-items"></div>
+        <div class="cart-total">總計: <span id="cart-total">Star 0</span></div>
+    </div>
+
+    <div id="notification"></div>
+
+    <footer>
+        <p>&copy; 2024 有點菜. 版權所有.</p>
+    </footer>
+
+    <script src="script.js"></script>
+</body>
+</html>

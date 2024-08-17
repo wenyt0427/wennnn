@@ -1,0 +1,333 @@
+body {
+    font-family: 'Noto Sans TC', Arial, sans-serif;
+    line-height: 1.6;
+    margin: 0;
+    padding: 0;
+    background-color: #f4f4f4;
+    display: flex;
+    flex-direction: column;
+    min-height: 100vh;
+}
+.banner-container {
+    position: relative;
+    width: 100%;
+    height: 300px;
+    overflow: hidden;
+}
+.banner {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    object-position: center bottom;
+}
+.banner-text {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    text-align: center;
+    color: white;
+    text-shadow: 2px 2px 4px rgba(0,0,0,0.7);
+}
+.banner-text h1 {
+    font-size: 4em;
+    margin-bottom: 0;
+    font-weight: 700;
+    letter-spacing: 2px;
+}
+.banner-text p {
+    font-size: 1.5em;
+    margin-top: 0.5em;
+}
+.home-button {
+    position: absolute;
+    top: 20px;
+    left: 20px;
+    font-size: 30px;
+    text-decoration: none;
+    background-color: rgba(255, 255, 255, 0.8);
+    border-radius: 50%;
+    width: 50px;
+    height: 50px;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+    z-index: 1000;
+    transition: transform 0.3s ease;
+}
+.home-button:hover {
+    transform: scale(1.1);
+}
+#floating-cart {
+    position: fixed;
+    top: 50%;
+    right: 20px;
+    transform: translateY(-50%);
+    background-color: #4CAF50;
+    color: white;
+    padding: 15px;
+    border-radius: 50%;
+    cursor: pointer;
+    box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+    z-index: 1000;
+}
+#floating-cart i {
+    font-size: 24px;
+}
+#cart-count {
+    position: absolute;
+    top: -5px;
+    right: -5px;
+    background-color: red;
+    color: white;
+    border-radius: 50%;
+    padding: 2px 6px;
+    font-size: 12px;
+}
+nav {
+    background-color: #333;
+    color: white;
+    padding: 0.5rem;
+}
+nav ul {
+    list-style-type: none;
+    padding: 0;
+    margin: 0;
+    text-align: center;
+}
+nav ul li {
+    display: inline;
+    margin-right: 10px;
+}
+nav ul li a {
+    color: white;
+    text-decoration: none;
+}
+.container {
+    width: 80%;
+    margin: auto;
+    overflow: hidden;
+    padding: 20px;
+        flex-grow: 1;
+}
+.products {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: space-between;
+}
+.product {
+    background: white;
+    border-radius: 5px;
+    padding: 15px;
+    margin-bottom: 20px;
+    width: calc(50% - 10px);
+    box-sizing: border-box;
+}
+.product img {
+    max-width: 100%;
+    height: auto;
+    margin-bottom: 10px;
+}
+.product-controls {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+}
+.product-name {
+    font-size: 1.2em;
+    font-weight: bold;
+}
+.product-price {
+    font-size: 1em;
+    color: #4CAF50;
+}
+.quantity-control {
+    display: flex;
+    align-items: center;
+}
+.quantity-control button {
+    width: 25px;
+    height: 25px;
+    font-size: 16px;
+    line-height: 1;
+    padding: 0;
+    background-color: #4CAF50;
+    color: white;
+    border: none;
+    cursor: pointer;
+    border-radius: 4px;
+}
+.quantity-display {
+    margin: 0 5px;
+    font-size: 16px;
+}
+.add-to-cart {
+    background-color: #4CAF50;
+    color: white;
+    border: none;
+    padding: 5px 10px;
+    text-align: center;
+    text-decoration: none;
+    display: inline-block;
+    font-size: 14px;
+    cursor: pointer;
+    border-radius: 4px;
+}
+footer {
+    background-color: #333;
+    color: white;
+    text-align: center;
+    padding: 1rem;
+    width: 100%;
+    margin-top: 20px;
+}
+#cart-sidebar {
+    position: fixed;
+    top: 0;
+    right: -300px;
+    width: 300px;
+    height: 100%;
+    background-color: white;
+    box-shadow: -2px 0 5px rgba(0,0,0,0.2);
+    transition: right 0.3s ease-in-out;
+    overflow-y: auto;
+    z-index: 1001;
+}
+#cart-sidebar.open {
+    right: 0;
+}
+#cart-sidebar h2 {
+    background-color: #4CAF50;
+    color: white;
+    margin: 0;
+    padding: 15px;
+}
+.cart-item {
+    display: flex;
+    align-items: center;
+    padding: 10px;
+    border-bottom: 1px solid #eee;
+}
+.cart-item img {
+    width: 50px;
+    height: 50px;
+    object-fit: cover;
+    margin-right: 10px;
+}
+.cart-item-info {
+    flex-grow: 1;
+}
+.cart-item-name {
+    font-weight: bold;
+}
+.cart-item-price {
+    color: #4CAF50;
+}
+.cart-total {
+    font-size: 1.2em;
+    font-weight: bold;
+    text-align: right;
+    padding: 15px;
+    border-top: 2px solid #4CAF50;
+}
+#close-cart {
+    position: absolute;
+    top: 10px;
+    right: 10px;
+    font-size: 24px;
+    cursor: pointer;
+    color: white;
+}
+#notification {
+    position: fixed;
+    top: 20px;
+    left: 50%;
+    transform: translateX(-50%);
+    background-color: #4CAF50;
+    color: white;
+    padding: 15px;
+    border-radius: 5px;
+    display: none;
+    z-index: 1002;
+}
+
+/* 修改後的客戶評價樣式 */
+.reviews-container {
+    width: 100%;
+    height: 320px;
+    overflow: hidden;
+    position: relative;
+}
+
+.reviews-carousel {
+    display: flex;
+    transition: transform 0.5s ease;
+}
+
+.review {
+    flex: 0 0 100%;
+    padding: 20px;
+    box-sizing: border-box;
+    background-color: white;
+    border-radius: 5px;
+    margin: 0 10px;
+    height: 280px;
+    transition: opacity 0.5s ease;
+}
+
+.review.active {
+    opacity: 1;
+}
+
+.review:not(.active) {
+    opacity: 0.3;
+}
+
+.avatar {
+    width: 60px;
+    height: 60px;
+    border-radius: 50%;
+    margin-bottom: 10px;
+}
+
+.stars {
+    color: #FFD700;
+    margin-bottom: 10px;
+}
+
+.reviewer-name {
+    font-style: italic;
+    color: #666;
+    margin-top: 10px;
+}
+
+.review-arrow {
+    position: absolute;
+    top: 50%;
+    transform: translateY(-50%);
+    background-color: rgba(0, 0, 0, 0.5);
+    color: white;
+    border: none;
+    padding: 10px 15px;
+    font-size: 24px;
+    cursor: pointer;
+    z-index: 10;
+}
+
+.review-arrow.left {
+    left: 10px;
+}
+
+.review-arrow.right {
+    right: 10px;
+}
+
+@media (max-width: 768px) {
+    .reviews-container {
+        height: 400px;
+    }
+    .review {
+        flex: 0 0 100%;
+    }
+}
