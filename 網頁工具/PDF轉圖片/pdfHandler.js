@@ -5,6 +5,9 @@ const PDFHandler = (function(utils, drawingTools) {
     const RENDER_SCALE = 2; // 提高渲染解析度
     let isDownloading = false; // 防止重複下載
     let originalFileName = ''; // 儲存原始檔案名稱
+    let zoomLevels = new Map(); // 儲存每頁的縮放級別
+    let pageOffsets = new Map(); // 儲存每頁的偏移量
+    let isDragging = false; // 用於追踪是否正在拖動
 
     function handleFile(file) {
         if (file.type !== 'application/pdf') {
@@ -62,6 +65,8 @@ const PDFHandler = (function(utils, drawingTools) {
             for (let i = 1; i <= pdf.numPages; i++) {
                 renderPage(i);
                 renderThumbnail(i);
+                zoomLevels.set(i, 1); // 初始化每頁的縮放級別為1
+                pageOffsets.set(i, { x: 0, y: 0 }); // 初始化每頁的偏移量
             }
             setActivePage(1, false);
             
@@ -83,6 +88,8 @@ const PDFHandler = (function(utils, drawingTools) {
             const pageContainer = document.createElement('div');
             pageContainer.className = 'page-container';
             pageContainer.id = `page-container-${pageNum}`;
+            const pageContent = document.createElement('div');
+            pageContent.className = 'page-content';
             const canvas = document.createElement('canvas');
             const context = canvas.getContext('2d');
 
@@ -104,14 +111,16 @@ const PDFHandler = (function(utils, drawingTools) {
             };
             page.render(renderContext);
 
-            pageContainer.appendChild(canvas);
+            pageContent.appendChild(canvas);
 
             const drawingCanvas = document.createElement('canvas');
             drawingCanvas.className = 'drawing-canvas';
             drawingCanvas.width = canvas.width;
             drawingCanvas.height = canvas.height;
             drawingCanvas.dataset.pageNum = pageNum;
-            pageContainer.appendChild(drawingCanvas);
+            pageContent.appendChild(drawingCanvas);
+
+            pageContainer.appendChild(pageContent);
 
             drawingTools.initializeDrawingCanvas(drawingCanvas, pageNum);
 
@@ -124,11 +133,19 @@ const PDFHandler = (function(utils, drawingTools) {
             const buttonsContainer = document.createElement('div');
             buttonsContainer.className = 'page-buttons';
 
+            const zoomIndicator = document.createElement('span');
+            zoomIndicator.className = 'zoom-indicator';
+            zoomIndicator.id = `zoom-indicator-${pageNum}`;
+            zoomIndicator.textContent = '100%';
+            buttonsContainer.appendChild(zoomIndicator);
+
+            const resetButton = utils.createButton('🔄', () => resetPageZoom(pageNum));
             const copyButton = utils.createButton('📋', () => copyPageToClipboard(pageNum, copyButton));
             const pngButton = utils.createButton('PNG', () => downloadPage(pageNum, 'png'));
             const jpgButton = utils.createButton('JPG', () => downloadPage(pageNum, 'jpg'));
             const deleteButton = utils.createButton('❌', () => deletePage(pageNum));
 
+            buttonsContainer.appendChild(resetButton);
             buttonsContainer.appendChild(copyButton);
             buttonsContainer.appendChild(pngButton);
             buttonsContainer.appendChild(jpgButton);
@@ -143,9 +160,110 @@ const PDFHandler = (function(utils, drawingTools) {
             document.getElementById('pdfViewer').appendChild(pageContainer);
 
             pageContainer.addEventListener('click', () => setActivePage(pageNum, false));
+            pageContainer.addEventListener('wheel', handlePageZoom);
+            pageContainer.addEventListener('mousedown', handlePageDrag);
 
             drawingTools.updateCursor();
         });
+    }
+
+    function handlePageZoom(e) {
+        if (e.ctrlKey) {
+            e.preventDefault();
+            const pageNum = parseInt(e.currentTarget.id.replace('page-container-', ''));
+            const delta = e.deltaY > 0 ? -0.1 : 0.1;
+            zoomPage(pageNum, delta);
+        }
+    }
+
+    function zoomPage(pageNum, delta) {
+        let currentZoom = zoomLevels.get(pageNum);
+        let newZoom = Math.max(1, Math.min(5, currentZoom + delta));
+        zoomLevels.set(pageNum, newZoom);
+
+        const pageContainer = document.getElementById(`page-container-${pageNum}`);
+        const pageContent = pageContainer.querySelector('.page-content');
+        pageContent.style.transform = `scale(${newZoom})`;
+
+        if (newZoom > 1) {
+            pageContainer.classList.add('zoomed');
+        } else {
+            pageContainer.classList.remove('zoomed');
+            resetPageOffset(pageNum);
+        }
+
+        updatePageTransform(pageNum);
+        updateZoomIndicator(pageNum, newZoom);
+    }
+
+    function updateZoomIndicator(pageNum, zoom) {
+        const zoomIndicator = document.getElementById(`zoom-indicator-${pageNum}`);
+        if (zoomIndicator) {
+            zoomIndicator.textContent = `${Math.round(zoom * 100)}%`;
+        }
+    }
+
+    function handlePageDrag(e) {
+        if (e.ctrlKey) {
+            e.preventDefault();
+            const pageNum = parseInt(e.currentTarget.id.replace('page-container-', ''));
+            const pageContainer = e.currentTarget;
+            const pageContent = pageContainer.querySelector('.page-content');
+
+            pageContainer.classList.add('dragging');
+            isDragging = true;
+            drawingTools.switchToMouseTool();
+
+            let startX = e.clientX;
+            let startY = e.clientY;
+
+            function onMouseMove(e) {
+                const dx = e.clientX - startX;
+                const dy = e.clientY - startY;
+                startX = e.clientX;
+                startY = e.clientY;
+
+                const currentOffset = pageOffsets.get(pageNum);
+                pageOffsets.set(pageNum, {
+                    x: currentOffset.x + dx,
+                    y: currentOffset.y + dy
+                });
+
+                updatePageTransform(pageNum);
+            }
+
+            function onMouseUp() {
+                document.removeEventListener('mousemove', onMouseMove);
+                document.removeEventListener('mouseup', onMouseUp);
+                pageContainer.classList.remove('dragging');
+                isDragging = false;
+                drawingTools.restorePreviousTool();
+            }
+
+            document.addEventListener('mousemove', onMouseMove);
+            document.addEventListener('mouseup', onMouseUp);
+        }
+    }
+
+    function updatePageTransform(pageNum) {
+        const pageContainer = document.getElementById(`page-container-${pageNum}`);
+        const pageContent = pageContainer.querySelector('.page-content');
+        const zoom = zoomLevels.get(pageNum);
+        const offset = pageOffsets.get(pageNum);
+        pageContent.style.transform = `scale(${zoom}) translate(${offset.x / zoom}px, ${offset.y / zoom}px)`;
+    }
+
+    function resetPageZoom(pageNum) {
+        zoomLevels.set(pageNum, 1);
+        resetPageOffset(pageNum);
+        updatePageTransform(pageNum);
+        updateZoomIndicator(pageNum, 1);
+        const pageContainer = document.getElementById(`page-container-${pageNum}`);
+        pageContainer.classList.remove('zoomed');
+    }
+
+    function resetPageOffset(pageNum) {
+        pageOffsets.set(pageNum, { x: 0, y: 0 });
     }
 
     function renderThumbnail(pageNum) {
@@ -202,8 +320,9 @@ const PDFHandler = (function(utils, drawingTools) {
     function copyPageToClipboard(pageNum, button) {
         const pageContainer = document.getElementById(`page-container-${pageNum}`);
         if (pageContainer) {
-            const pdfCanvas = pageContainer.querySelector('canvas:not(.drawing-canvas)');
-            const drawingCanvas = pageContainer.querySelector('.drawing-canvas');
+            const pageContent = pageContainer.querySelector('.page-content');
+            const pdfCanvas = pageContent.querySelector('canvas:not(.drawing-canvas)');
+            const drawingCanvas = pageContent.querySelector('.drawing-canvas');
 
             const mergedCanvas = document.createElement('canvas');
             mergedCanvas.width = pdfCanvas.width;
@@ -231,13 +350,15 @@ const PDFHandler = (function(utils, drawingTools) {
 
     function downloadPage(pageNum, format) {
         const pageContainer = document.getElementById(`page-container-${pageNum}`);
-        const pdfCanvas = pageContainer.querySelector('canvas:not(.drawing-canvas)');
-        const drawingCanvas = pageContainer.querySelector('.drawing-canvas');
+        const pageContent = pageContainer.querySelector('.page-content');
+        const pdfCanvas = pageContent.querySelector('canvas:not(.drawing-canvas)');
+        const drawingCanvas = pageContent.querySelector('.drawing-canvas');
 
         const mergedCanvas = document.createElement('canvas');
         mergedCanvas.width = pdfCanvas.width;
         mergedCanvas.height = pdfCanvas.height;
         const ctx = mergedCanvas.getContext('2d');
+
         ctx.drawImage(pdfCanvas, 0, 0);
         ctx.drawImage(drawingCanvas, 0, 0);
 
@@ -261,7 +382,7 @@ const PDFHandler = (function(utils, drawingTools) {
         }
     }
 
-    function navigatePage(direction) {
+        function navigatePage(direction) {
         if (pdfDoc) {
             const newPage = currentPage + direction;
             if (newPage >= 1 && newPage <= pdfDoc.numPages) {
@@ -287,30 +408,40 @@ const PDFHandler = (function(utils, drawingTools) {
         progressBar.value = 0;
 
         try {
+            // 重置所有頁面的縮放和偏移
+            for (let i = 1; i <= pdfDoc.numPages; i++) {
+                resetPageZoom(i);
+            }
+
+            // 等待一小段時間，確保 DOM 更新
+            await new Promise(resolve => setTimeout(resolve, 100));
+
             const pdfBytes = await pdfDoc.getData();
             const existingPdfDoc = await PDFLib.PDFDocument.load(pdfBytes);
             const newPdfDoc = await PDFLib.PDFDocument.create();
 
             for (let i = 1; i <= pdfDoc.numPages; i++) {
-                const [embeddedPage] = await newPdfDoc.embedPdf(existingPdfDoc, [i - 1]);
+                const [embeddedPage] = await newPdfDoc.embedPages([existingPdfDoc.getPage(i - 1)]);
                 const { width, height } = embeddedPage.scale(1);
                 const page = newPdfDoc.addPage([width, height]);
                 page.drawPage(embeddedPage);
 
-                const pageImage = await createCompressedPageImage(i);
-                const image = await newPdfDoc.embedPng(pageImage);
-                page.drawImage(image, {
-                    x: 0,
-                    y: 0,
-                    width: width,
-                    height: height,
-                });
+                const drawingLayer = await createCompressedDrawingLayer(i, width, height);
+                if (drawingLayer) {
+                    const image = await newPdfDoc.embedPng(drawingLayer);
+                    page.drawImage(image, {
+                        x: 0,
+                        y: 0,
+                        width: width,
+                        height: height,
+                    });
+                }
 
                 progressBar.value = (i / pdfDoc.numPages) * 100;
             }
 
             const pdfBytesCompressed = await newPdfDoc.save({
-                useObjectStreams: false,
+                useObjectStreams: true,
                 addDefaultPage: false,
                 objectsPerTick: 100,
                 updateFieldAppearances: false,
@@ -331,27 +462,39 @@ const PDFHandler = (function(utils, drawingTools) {
         }
     }
 
-    async function createCompressedPageImage(pageNum) {
-        const pageContainer = document.getElementById(`page-container-${pageNum}`);
-        const pdfCanvas = pageContainer.querySelector('canvas:not(.drawing-canvas)');
-        const drawingCanvas = pageContainer.querySelector('.drawing-canvas');
+    async function createCompressedDrawingLayer(pageNum, width, height) {
+        const drawingCanvas = document.querySelector(`#page-container-${pageNum} .drawing-canvas`);
+        if (!drawingCanvas) return null;
 
-        const mergedCanvas = document.createElement('canvas');
-        mergedCanvas.width = pdfCanvas.width;
-        mergedCanvas.height = pdfCanvas.height;
-        const ctx = mergedCanvas.getContext('2d');
+        const drawingContext = drawingCanvas.getContext('2d');
+        const imageData = drawingContext.getImageData(0, 0, drawingCanvas.width, drawingCanvas.height);
+        
+        // Check if the drawing layer is empty
+        if (!imageData.data.some(channel => channel !== 0)) {
+            return null;
+        }
 
-        ctx.drawImage(pdfCanvas, 0, 0);
-        ctx.drawImage(drawingCanvas, 0, 0);
+        const tempCanvas = document.createElement('canvas');
+        tempCanvas.width = width;
+        tempCanvas.height = height;
+        const tempContext = tempCanvas.getContext('2d');
+
+        // 計算縮放比例
+        const scaleX = width / drawingCanvas.width;
+        const scaleY = height / drawingCanvas.height;
+
+        // 應用縮放
+        tempContext.scale(scaleX, scaleY);
+        tempContext.drawImage(drawingCanvas, 0, 0);
 
         return new Promise((resolve) => {
-            mergedCanvas.toBlob((blob) => {
+            tempCanvas.toBlob((blob) => {
                 const reader = new FileReader();
                 reader.onloadend = function() {
                     resolve(reader.result);
                 }
                 reader.readAsDataURL(blob);
-            }, 'image/png', 0.5);  // 使用 50% 的質量，可以根據需要調整
+            }, 'image/png', 1);  // 使用最高質量以保持繪圖清晰度
         });
     }
 
@@ -366,6 +509,10 @@ const PDFHandler = (function(utils, drawingTools) {
         navigatePage: navigatePage,
         scrollToPage: scrollToPage,
         setActivePage: setActivePage,
-        downloadPDF: downloadPDF
+        downloadPDF: downloadPDF,
+        resetPageZoom: resetPageZoom,
+        zoomPage: zoomPage,
+        handlePageDrag: handlePageDrag,
+        isDragging: () => isDragging
     };
 })(Utils, DrawingTools);
