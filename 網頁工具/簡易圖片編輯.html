@@ -83,7 +83,7 @@
             border-right: none;
         }
 
-        #toolbar label {
+        #toolbar label, #zoom-level {
             font-weight: 500;
             font-size: 0.75rem; /* MODIFIED */
             cursor: pointer;
@@ -361,7 +361,6 @@
         let resizingHandle = null;
         const handleSize = 8;
         let originalObjectProps = {};
-        let hideTopBarTimeout;
 
         // --- History (Undo/Redo) ---
         let history = [];
@@ -648,14 +647,16 @@
             }
         });
 
-        deleteBtn.addEventListener('click', () => {
+        function deleteSelectedObject() {
             if (selectedObject) {
                 objects = objects.filter(obj => obj !== selectedObject);
                 selectedObject = null;
                 redrawCanvas();
                 saveState();
             }
-        });
+        }
+
+        deleteBtn.addEventListener('click', deleteSelectedObject);
         
         // --- History Handlers ---
         undoBtn.addEventListener('click', undo);
@@ -664,10 +665,14 @@
         window.addEventListener('keydown', (e) => {
             const activeEl = document.activeElement;
             if (activeEl && (activeEl.tagName === 'INPUT' || activeEl.tagName === 'TEXTAREA')) return;
+            
             if (e.ctrlKey || e.metaKey) {
                 const key = e.key.toLowerCase();
                 if (key === 'z') { e.preventDefault(); undo(); }
                 if (key === 'y') { e.preventDefault(); redo(); }
+            } else if (e.key === 'Delete' || e.key === 'Backspace') {
+                e.preventDefault();
+                deleteSelectedObject();
             }
         });
         
