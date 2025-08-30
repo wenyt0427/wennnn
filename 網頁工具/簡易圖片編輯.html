@@ -355,12 +355,14 @@
         let currentTool = 'select';
         let previousTool = 'select';
         let isDrawing = false, isDragging = false, isResizing = false;
-        let selectedObject = null;
+        let selectedObjects = [];
         let startX, startY;
         let tempInput = null;
         let resizingHandle = null;
         const handleSize = 8;
-        let originalObjectProps = {};
+        let originalObjectProps = [];
+        let isMarqueeSelecting = false;
+        let marqueeRect = { x: 0, y: 0, width: 0, height: 0 };
 
         // --- History (Undo/Redo) ---
         let history = [];
@@ -373,8 +375,8 @@
             ctx.fillRect(0, 0, canvas.width, canvas.height);
             if (backgroundImage) ctx.drawImage(backgroundImage, 0, 0);
             objects.forEach(drawObject);
-            if (selectedObject) {
-                drawSelection(selectedObject);
+            if (selectedObjects.length > 0) {
+                drawSelection();
             }
         }
 
@@ -407,16 +409,26 @@
             }
         }
 
-        function drawSelection(obj) {
+        function drawSelection() {
             ctx.strokeStyle = 'rgba(0, 123, 255, 0.8)';
             ctx.lineWidth = 2;
-            const bounds = getObjectBounds(obj);
-            if (obj.type !== 'line') {
+            
+            if (selectedObjects.length === 1) {
+                const obj = selectedObjects[0];
+                const bounds = getObjectBounds(obj);
+                if (obj.type !== 'line') {
+                    ctx.setLineDash([6, 4]);
+                    ctx.strokeRect(bounds.x, bounds.y, bounds.width, bounds.height);
+                    ctx.setLineDash([]);
+                }
+                drawHandles(obj);
+            } else if (selectedObjects.length > 1) {
+                const groupBounds = getGroupBounds(selectedObjects);
                 ctx.setLineDash([6, 4]);
-                ctx.strokeRect(bounds.x, bounds.y, bounds.width, bounds.height);
+                ctx.strokeRect(groupBounds.x, groupBounds.y, groupBounds.width, groupBounds.height);
                 ctx.setLineDash([]);
+                // No handles for group selection
             }
-            drawHandles(obj);
         }
 
         // --- 事件監聽器設定 ---
@@ -454,7 +466,7 @@
             });
             
             updateCursor();
-            selectedObject = null;
+            selectedObjects = [];
             if (tempInput) tempInput.blur();
             redrawCanvas();
         }
@@ -463,7 +475,14 @@
         
         const syncFontSize = (value) => {
             fontSizeInput.value = value; fontSizeNumInput.value = value;
-            if (selectedObject && selectedObject.type === 'text') { selectedObject.fontSize = value; redrawCanvas(); }
+            if (selectedObjects.length > 0) {
+                selectedObjects.forEach(obj => {
+                    if(obj.type === 'text') {
+                        obj.fontSize = value;
+                    }
+                });
+                redrawCanvas();
+            }
         };
         fontSizeInput.addEventListener('input', (e) => syncFontSize(e.target.value));
         fontSizeNumInput.addEventListener('input', (e) => syncFontSize(e.target.value));
@@ -472,8 +491,12 @@
 
         lineWidthInput.addEventListener('input', (e) => {
             lineWidthValue.textContent = e.target.value;
-            if (selectedObject && ['rect', 'line', 'pencil'].includes(selectedObject.type)) {
-                selectedObject.lineWidth = e.target.value;
+            if (selectedObjects.length > 0) {
+                selectedObjects.forEach(obj => {
+                    if (['rect', 'line', 'pencil'].includes(obj.type)) {
+                        obj.lineWidth = e.target.value;
+                    }
+                });
                 redrawCanvas();
             }
             if (['pencil', 'rect', 'line'].includes(currentTool)) {
@@ -482,20 +505,29 @@
         });
         lineWidthInput.addEventListener('change', saveState);
 
-        colorPicker.addEventListener('input', () => {
+        // MODIFIED: Real-time color update
+        colorPicker.addEventListener('input', (e) => {
              if (['pencil', 'rect', 'line'].includes(currentTool)) updateBrushCursor();
+             if (selectedObjects.length > 0) {
+                selectedObjects.forEach(obj => {
+                    obj.color = e.target.value;
+                });
+                redrawCanvas();
+            }
         });
         colorPicker.addEventListener('change', (e) => {
-            if (selectedObject) {
-                selectedObject.color = e.target.value; redrawCanvas(); saveState();
+            if (selectedObjects.length > 0) {
+                saveState();
             }
         });
         
         opacitySlider.addEventListener('input', (e) => {
             const value = parseFloat(e.target.value);
             opacityValue.textContent = value.toFixed(2);
-            if (selectedObject) {
-                selectedObject.opacity = value;
+            if (selectedObjects.length > 0) {
+                selectedObjects.forEach(obj => {
+                    obj.opacity = value;
+                });
                 redrawCanvas();
             }
             if (['pencil', 'rect', 'line'].includes(currentTool)) updateBrushCursor();
@@ -516,14 +548,29 @@
 
             if (currentTool === 'select' && resizingHandle) {
                 isResizing = true;
-                originalObjectProps = JSON.parse(JSON.stringify(selectedObject));
+                originalObjectProps = [JSON.parse(JSON.stringify(selectedObjects[0]))];
             } else if (currentTool === 'select') {
-                selectedObject = getObjectAtPosition(x, y);
-                if (selectedObject) {
+                const clickedObject = getObjectAtPosition(x, y);
+                if (clickedObject) {
+                    if (e.shiftKey) { // Add/remove from selection
+                        if (selectedObjects.includes(clickedObject)) {
+                            selectedObjects = selectedObjects.filter(o => o !== clickedObject);
+                        } else {
+                            selectedObjects.push(clickedObject);
+                        }
+                    } else if (!selectedObjects.includes(clickedObject)) {
+                        selectedObjects = [clickedObject];
+                    }
                     isDragging = true;
-                    originalObjectProps = JSON.parse(JSON.stringify(selectedObject));
+                    originalObjectProps = JSON.parse(JSON.stringify(selectedObjects));
                     startX = x; startY = y;
-                    updateToolbarForSelection(selectedObject);
+                    if (selectedObjects.length === 1) {
+                        updateToolbarForSelection(selectedObjects[0]);
+                    }
+                } else {
+                    isMarqueeSelecting = true;
+                    selectedObjects = [];
+                    marqueeRect = { x, y, width: 0, height: 0 };
                 }
             } else if (currentTool === 'text') {
                 createOnCanvasInput(x, y);
@@ -545,13 +592,29 @@
             if (isDragging) {
                 const dx = x - startX;
                 const dy = y - startY;
-                if (selectedObject.type === 'pencil') {
-                    selectedObject.points = originalObjectProps.points.map(p => ({ x: p.x + dx, y: p.y + dy }));
-                } else {
-                    selectedObject.x = originalObjectProps.x + dx;
-                    selectedObject.y = originalObjectProps.y + dy;
-                }
+                selectedObjects.forEach((obj, index) => {
+                    const orig = originalObjectProps[index];
+                    if (obj.type === 'pencil') {
+                        obj.points = orig.points.map(p => ({ x: p.x + dx, y: p.y + dy }));
+                    } else {
+                        obj.x = orig.x + dx;
+                        obj.y = orig.y + dy;
+                    }
+                });
                 redrawCanvas();
+                return;
+            }
+            if (isMarqueeSelecting) {
+                redrawCanvas();
+                marqueeRect.width = x - marqueeRect.x;
+                marqueeRect.height = y - marqueeRect.y;
+                ctx.fillStyle = 'rgba(0, 123, 255, 0.2)';
+                ctx.strokeStyle = 'rgba(0, 123, 255, 0.8)';
+                ctx.lineWidth = 1;
+                ctx.beginPath();
+                ctx.rect(marqueeRect.x, marqueeRect.y, marqueeRect.width, marqueeRect.height);
+                ctx.fill();
+                ctx.stroke();
                 return;
             }
             if (isDrawing) {
@@ -580,6 +643,23 @@
 
         canvas.addEventListener('mouseup', (e) => {
             let stateChanged = false;
+            if (isMarqueeSelecting) {
+                const selectionBounds = {
+                    x: Math.min(marqueeRect.x, marqueeRect.x + marqueeRect.width),
+                    y: Math.min(marqueeRect.y, marqueeRect.y + marqueeRect.height),
+                    width: Math.abs(marqueeRect.width),
+                    height: Math.abs(marqueeRect.height)
+                };
+                selectedObjects = objects.filter(obj => {
+                    const objBounds = getObjectBounds(obj);
+                    return (
+                        objBounds.x < selectionBounds.x + selectionBounds.width &&
+                        objBounds.x + objBounds.width > selectionBounds.x &&
+                        objBounds.y < selectionBounds.y + selectionBounds.height &&
+                        objBounds.y + objBounds.height > selectionBounds.y
+                    );
+                });
+            }
             if (isDrawing) {
                 let currentObjectIsFinalized = false;
                 if (currentTool === 'pencil') {
@@ -603,9 +683,10 @@
                     }
                 }
             }
-            if (isDragging || isResizing) stateChanged = true;
+            if (isDragging || isResizing || isMarqueeSelecting) stateChanged = true;
             if (stateChanged) saveState();
-            isDrawing = isDragging = isResizing = false; resizingHandle = null;
+            isDrawing = isDragging = isResizing = isMarqueeSelecting = false;
+            resizingHandle = null;
             redrawCanvas();
         });
 
@@ -614,7 +695,7 @@
             const { x, y } = getMousePos(e);
             const clickedObject = getObjectAtPosition(x, y);
             if (clickedObject && clickedObject.type === 'text') {
-                selectedObject = null;
+                selectedObjects = [];
                 objects = objects.filter(obj => obj !== clickedObject);
                 redrawCanvas();
                 createOnCanvasInput(clickedObject.x, clickedObject.y, clickedObject.text, clickedObject.color, clickedObject.fontSize, clickedObject.opacity);
@@ -622,7 +703,7 @@
         });
 
         downloadBtn.addEventListener('click', () => {
-            selectedObject = null; 
+            selectedObjects = []; 
             redrawCanvas();
             const link = document.createElement('a');
             let downloadName = downloadNameInput.value.trim() || (originalFilename ? `${originalFilename}_繪製版` : 'edited-image');
@@ -633,7 +714,7 @@
         });
         
         copyBtn.addEventListener('click', async () => {
-            selectedObject = null;
+            selectedObjects = [];
             redrawCanvas();
             try {
                 const blob = await new Promise(resolve => canvas.toBlob(resolve, 'image/png'));
@@ -648,9 +729,9 @@
         });
 
         function deleteSelectedObject() {
-            if (selectedObject) {
-                objects = objects.filter(obj => obj !== selectedObject);
-                selectedObject = null;
+            if (selectedObjects.length > 0) {
+                objects = objects.filter(obj => !selectedObjects.includes(obj));
+                selectedObjects = [];
                 redrawCanvas();
                 saveState();
             }
@@ -762,8 +843,7 @@
                 }
                 document.body.removeChild(tempInput); 
                 tempInput = null; 
-                if (!continuousDrawingCheckbox.checked) selectTool('select');
-                else redrawCanvas();
+                selectTool('select'); // MODIFIED: Always switch to select tool
                 saveState();
             };
             tempInput.addEventListener('blur', finalize);
@@ -828,7 +908,7 @@
                         const { x, y } = getMousePos(e);
                         const handle = getHandleAtPosition(x, y);
                         if (handle) {
-                            if (selectedObject && selectedObject.type === 'line') { canvas.style.cursor = 'pointer'; } 
+                            if (selectedObjects.length === 1 && selectedObjects[0].type === 'line') { canvas.style.cursor = 'pointer'; } 
                             else {
                                 if (handle.includes('n') || handle.includes('s')) canvas.style.cursor = 'ns-resize';
                                 else if (handle.includes('w') || handle.includes('e')) canvas.style.cursor = 'ew-resize';
@@ -877,6 +957,19 @@
         }
 
         // --- Scaling and Selection Functions ---
+        function getGroupBounds(objects) {
+            if (objects.length === 0) return { x: 0, y: 0, width: 0, height: 0 };
+            let minX = Infinity, minY = Infinity;
+            let maxX = -Infinity, maxY = -Infinity;
+            objects.forEach(obj => {
+                const bounds = getObjectBounds(obj);
+                minX = Math.min(minX, bounds.x);
+                minY = Math.min(minY, bounds.y);
+                maxX = Math.max(maxX, bounds.x + bounds.width);
+                maxY = Math.max(maxY, bounds.y + bounds.height);
+            });
+            return { x: minX, y: minY, width: maxX - minX, height: maxY - minY };
+        }
         function getObjectBounds(obj) {
             if (obj.type === 'pencil') {
                 if (!obj.points || obj.points.length === 0) return { x: 0, y: 0, width: 0, height: 0 };
@@ -906,6 +999,7 @@
             return { 'nw':{x:b.x,y:b.y}, 'n':{x:b.x+b.width/2,y:b.y}, 'ne':{x:b.x+b.width,y:b.y}, 'w':{x:b.x,y:b.y+b.height/2}, 'e':{x:b.x+b.width,y:b.y+b.height/2}, 'sw':{x:b.x,y:b.y+b.height}, 's':{x:b.x+b.width/2,y:b.y+b.height}, 'se':{x:b.x+b.width,y:b.y+b.height} };
         }
         function drawHandles(obj) {
+            if (selectedObjects.length > 1) return;
             const handles = getHandles(obj);
             ctx.fillStyle = '#fff'; ctx.strokeStyle = '#007bff'; ctx.lineWidth = 1;
             for (const key in handles) {
@@ -916,8 +1010,8 @@
             }
         }
         function getHandleAtPosition(x, y) {
-            if (!selectedObject) return null;
-            const handles = getHandles(selectedObject);
+            if (selectedObjects.length !== 1) return null;
+            const handles = getHandles(selectedObjects[0]);
             for (const key in handles) {
                 const h = handles[key];
                 if (x >= h.x - handleSize && x <= h.x + handleSize && y >= h.y - handleSize && y <= h.y + handleSize) return key;
@@ -925,7 +1019,8 @@
             return null;
         }
         function resizeObject(mouseX, mouseY) {
-            const obj = selectedObject, orig = originalObjectProps;
+            if (selectedObjects.length !== 1) return;
+            const obj = selectedObjects[0], orig = originalObjectProps[0];
             if (obj.type === 'line') {
                 const origEndX = orig.x + orig.width, origEndY = orig.y + orig.height;
                 if (resizingHandle === 'start') {
@@ -991,7 +1086,7 @@
             if (historyIndex > 0) {
                 historyIndex--;
                 objects = JSON.parse(JSON.stringify(history[historyIndex]));
-                selectedObject = null;
+                selectedObjects = [];
                 redrawCanvas();
                 updateHistoryButtons();
             }
@@ -1000,7 +1095,7 @@
             if (historyIndex < history.length - 1) {
                 historyIndex++;
                 objects = JSON.parse(JSON.stringify(history[historyIndex]));
-                selectedObject = null;
+                selectedObjects = [];
                 redrawCanvas();
                 updateHistoryButtons();
             }
