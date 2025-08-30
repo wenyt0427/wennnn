@@ -734,6 +734,9 @@
         function createOnCanvasInput(x, y, text = '', color, fontSize, opacity) {
             if (tempInput) tempInput.blur();
             const rect = canvas.getBoundingClientRect(); 
+            const scaleX = rect.width / canvas.width;
+            const scaleY = rect.height / canvas.height;
+
             color = color || colorPicker.value;
             fontSize = fontSize || fontSizeInput.value;
             opacity = opacity !== undefined ? opacity : parseFloat(opacitySlider.value);
@@ -742,10 +745,10 @@
             document.body.appendChild(tempInput);
             Object.assign(tempInput.style, {
                 position: 'absolute', 
-                left: `${rect.left + window.scrollX + x}px`, 
-                top: `${rect.top + window.scrollY + y}px`,
+                left: `${rect.left + window.scrollX + (x * scaleX)}px`, 
+                top: `${rect.top + window.scrollY + (y * scaleY)}px`,
                 color: color, 
-                fontSize: `${fontSize}px`, 
+                fontSize: `${fontSize * scaleY}px`, 
                 fontFamily: 'Arial', lineHeight: '1.1'
             });
             setTimeout(() => tempInput.focus(), 0);
