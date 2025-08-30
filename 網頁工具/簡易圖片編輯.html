@@ -121,6 +121,76 @@
             position: absolute; background: rgba(255, 255, 255, 0.95); border: 1px dashed var(--primary-color);
             padding: 2px; margin: 0; outline: none; z-index: 100; resize: none; overflow: hidden; white-space: pre;
         }
+        
+        /* Toast Notification */
+        .toast {
+            position: fixed;
+            bottom: 30px;
+            left: 50%;
+            transform: translateX(-50%);
+            background-color: rgba(0, 0, 0, 0.75);
+            color: #fff;
+            padding: 10px 20px;
+            border-radius: 20px;
+            z-index: 1000;
+            opacity: 0;
+            transition: opacity 0.3s ease, bottom 0.3s ease;
+            pointer-events: none;
+        }
+        .toast.show {
+            opacity: 1;
+            bottom: 50px;
+        }
+
+        /* Modal Styles */
+        .modal-overlay {
+            position: fixed;
+            top: 0; left: 0;
+            width: 100%; height: 100%;
+            background: rgba(0, 0, 0, 0.6);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 2000;
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.3s ease;
+        }
+        .modal-overlay.show {
+            opacity: 1;
+            pointer-events: auto;
+        }
+        .modal-content {
+            background: #fff;
+            padding: 2rem;
+            border-radius: 1rem;
+            box-shadow: 0 5px 20px rgba(0,0,0,0.2);
+            text-align: center;
+            max-width: 90vw;
+            max-height: 90vh;
+            overflow-y: auto;
+            position: relative;
+            transform: scale(0.9);
+            transition: transform 0.3s ease;
+        }
+        .modal-overlay.show .modal-content {
+            transform: scale(1);
+        }
+        .modal-content img {
+            max-width: 100%;
+            max-height: 60vh;
+            margin-top: 1rem;
+            border: 1px solid var(--border-color);
+        }
+        .modal-close-btn {
+            position: absolute;
+            top: 1rem; right: 1rem;
+            background: none;
+            border: none;
+            font-size: 2rem;
+            cursor: pointer;
+            color: #888;
+        }
     </style>
 </head>
 <body>
@@ -137,6 +207,7 @@
             <button class="tool-btn active" data-tool="select" title="移動/選取/縮放">🖐️</button>
             <button class="tool-btn" data-tool="rect" title="矩形">▭</button>
             <button class="tool-btn" data-tool="line" title="線條">∕</button>
+            <button class="tool-btn" data-tool="pencil" title="畫筆">✏️</button>
             <button class="tool-btn" data-tool="text" title="文字">T</button>
         </div>
 
@@ -154,7 +225,7 @@
         </div>
 
         <div class="tool-group">
-            <label for="line-width">線條:</label>
+            <label for="line-width">線條/筆觸:</label>
             <input type="range" id="line-width" min="1" max="100" value="5">
             <span id="line-width-value">5</span>
         </div>
@@ -175,11 +246,21 @@
             <button id="delete-btn" title="刪除選取">🗑️</button>
             <input type="text" id="download-name-input" title="下載檔名" value="edited-image">
             <button id="download-btn" style="background-color: #28a745; color: white;">下載圖片</button>
+            <button id="copy-btn" title="複製圖片到剪貼簿">📋 複製</button>
         </div>
     </div>
 
     <div id="canvas-container">
         <canvas id="canvas" width="800" height="600"></canvas>
+    </div>
+
+    <div id="copy-modal" class="modal-overlay">
+        <div class="modal-content">
+            <button id="modal-close-btn" class="modal-close-btn">&times;</button>
+            <h3>複製圖片</h3>
+            <p>您的瀏覽器安全設定已阻擋直接複製。<br>請在此圖片上按右鍵，並選擇「複製圖片」。</p>
+            <img id="copy-modal-img" src="" alt="預覽圖片">
+        </div>
     </div>
 
     <script>
@@ -189,8 +270,8 @@
         // --- DOM 元素 ---
         const uploader = document.getElementById('uploader');
         const colorPicker = document.getElementById('color-picker');
-        const opacitySlider = document.getElementById('opacity-slider'); // NEW
-        const opacityValue = document.getElementById('opacity-value');   // NEW
+        const opacitySlider = document.getElementById('opacity-slider');
+        const opacityValue = document.getElementById('opacity-value');
         const lineWidthInput = document.getElementById('line-width');
         const lineWidthValue = document.getElementById('line-width-value');
         const fontSizeInput = document.getElementById('font-size');
@@ -202,6 +283,10 @@
         const undoBtn = document.getElementById('undo-btn');
         const redoBtn = document.getElementById('redo-btn');
         const continuousDrawingCheckbox = document.getElementById('continuous-drawing-checkbox');
+        const copyBtn = document.getElementById('copy-btn');
+        const copyModal = document.getElementById('copy-modal');
+        const copyModalImg = document.getElementById('copy-modal-img');
+        const modalCloseBtn = document.getElementById('modal-close-btn');
         
         // --- 應用程式狀態變數 ---
         let objects = [];
@@ -210,7 +295,7 @@
         let currentTool = 'select';
         let isDrawing = false, isDragging = false, isResizing = false;
         let selectedObject = null;
-        let startX, startY, dragOffsetX, dragOffsetY;
+        let startX, startY;
         let tempInput = null;
         let resizingHandle = null;
         const handleSize = 8;
@@ -231,10 +316,23 @@
         }
 
         function drawObject(obj) {
-            const rgbaColor = hexToRgba(obj.color, obj.opacity); // USE RGBA
+            const rgbaColor = hexToRgba(obj.color, obj.opacity);
             ctx.strokeStyle = rgbaColor;
             ctx.fillStyle = rgbaColor;
-            if (obj.type === 'rect' || obj.type === 'line') {
+
+            if (obj.type === 'pencil') {
+                ctx.lineCap = 'round';
+                ctx.lineJoin = 'round';
+                ctx.lineWidth = obj.lineWidth;
+                ctx.beginPath();
+                if (obj.points && obj.points.length > 0) {
+                    ctx.moveTo(obj.points[0].x, obj.points[0].y);
+                    for (let i = 1; i < obj.points.length; i++) {
+                        ctx.lineTo(obj.points[i].x, obj.points[i].y);
+                    }
+                }
+                ctx.stroke();
+            } else if (obj.type === 'rect' || obj.type === 'line') {
                 ctx.lineWidth = obj.lineWidth;
                 ctx.beginPath();
                 if (obj.type === 'rect') ctx.strokeRect(obj.x, obj.y, obj.width, obj.height);
@@ -262,16 +360,29 @@
         // --- 事件監聽器設定 ---
         uploader.addEventListener('change', (e) => {
             const file = e.target.files[0]; if (!file) return;
-            originalFilename = file.name.split('.').slice(0, -1).join('.');
-            downloadNameInput.value = `${originalFilename}_繪製版`;
-            const reader = new FileReader();
-            reader.onload = (event) => {
-                backgroundImage = new Image();
-                backgroundImage.onload = () => { canvas.width = backgroundImage.width; canvas.height = backgroundImage.height; redrawCanvas(); saveState(); };
-                backgroundImage.src = event.target.result;
-            };
-            reader.readAsDataURL(file);
+            handleImageFile(file);
         });
+
+        // NEW: Paste Event Listener
+        window.addEventListener('paste', (e) => {
+            if (tempInput) return; // Don't paste if editing text
+            const items = e.clipboardData.items;
+            let imageFile = null;
+
+            for (let i = 0; i < items.length; i++) {
+                if (items[i].type.indexOf('image') !== -1) {
+                    imageFile = items[i].getAsFile();
+                    break;
+                }
+            }
+
+            if (imageFile) {
+                e.preventDefault();
+                handleImageFile(imageFile, true); // Pass true for pasted image
+                showToast('已成功貼上圖片！');
+            }
+        });
+
 
         toolBtns.forEach(btn => btn.addEventListener('click', () => {
             toolBtns.forEach(b => b.classList.remove('active'));
@@ -294,7 +405,7 @@
 
         lineWidthInput.addEventListener('input', (e) => {
             lineWidthValue.textContent = e.target.value;
-            if (selectedObject && (selectedObject.type === 'rect' || selectedObject.type === 'line')) {
+            if (selectedObject && (selectedObject.type === 'rect' || selectedObject.type === 'line' || selectedObject.type === 'pencil')) {
                 selectedObject.lineWidth = e.target.value; redrawCanvas();
             }
         });
@@ -306,7 +417,6 @@
             }
         });
         
-        // NEW: Opacity Slider Listener
         opacitySlider.addEventListener('input', (e) => {
             const value = parseFloat(e.target.value);
             opacityValue.textContent = value.toFixed(2);
@@ -321,18 +431,25 @@
             if (tempInput) { tempInput.blur(); return; }
             const { x, y } = getMousePos(e); startX = x; startY = y;
             resizingHandle = getHandleAtPosition(x, y);
+
             if (currentTool === 'select' && resizingHandle) {
                 isResizing = true;
                 originalObjectProps = JSON.parse(JSON.stringify(selectedObject));
             } else if (currentTool === 'select') {
                 selectedObject = getObjectAtPosition(x, y);
                 if (selectedObject) {
-                    isDragging = true; dragOffsetX = x - selectedObject.x; dragOffsetY = y - selectedObject.y;
+                    isDragging = true;
+                    originalObjectProps = JSON.parse(JSON.stringify(selectedObject));
+                    startX = x; startY = y;
                     updateToolbarForSelection(selectedObject);
                 }
             } else if (currentTool === 'text') {
                 createOnCanvasInput(x, y);
-            } else {
+            } else if (currentTool === 'pencil') {
+                 isDrawing = true;
+                const newObject = { type: 'pencil', points: [{ x, y }], color: colorPicker.value, opacity: parseFloat(opacitySlider.value), lineWidth: lineWidthInput.value };
+                objects.push(newObject);
+            } else { // rect, line
                 isDrawing = true;
             }
             redrawCanvas();
@@ -341,14 +458,31 @@
         canvas.addEventListener('mousemove', (e) => {
             const { x, y } = getMousePos(e);
             if (isResizing) { resizeObject(x, y); redrawCanvas(); return; }
-            if (isDragging) { selectedObject.x = x - dragOffsetX; selectedObject.y = y - dragOffsetY; redrawCanvas(); return; }
-            if (isDrawing) {
+            if (isDragging) {
+                const dx = x - startX;
+                const dy = y - startY;
+                if (selectedObject.type === 'pencil') {
+                    selectedObject.points = originalObjectProps.points.map(p => ({ x: p.x + dx, y: p.y + dy }));
+                } else {
+                    selectedObject.x = originalObjectProps.x + dx;
+                    selectedObject.y = originalObjectProps.y + dy;
+                }
                 redrawCanvas();
-                const previewColor = hexToRgba(colorPicker.value, 0.7); // Preview with some transparency
-                ctx.strokeStyle = previewColor;
-                ctx.lineWidth = lineWidthInput.value;
-                if (currentTool === 'rect') ctx.strokeRect(startX, startY, x - startX, y - startY);
-                else if (currentTool === 'line') { ctx.beginPath(); ctx.moveTo(startX, startY); ctx.lineTo(x, y); ctx.stroke(); }
+                return;
+            }
+            if (isDrawing) {
+                if (currentTool === 'pencil') {
+                    const currentPath = objects[objects.length - 1];
+                    currentPath.points.push({ x, y });
+                    redrawCanvas();
+                } else {
+                    redrawCanvas();
+                    const previewColor = hexToRgba(colorPicker.value, 0.7);
+                    ctx.strokeStyle = previewColor;
+                    ctx.lineWidth = lineWidthInput.value;
+                    if (currentTool === 'rect') ctx.strokeRect(startX, startY, x - startX, y - startY);
+                    else if (currentTool === 'line') { ctx.beginPath(); ctx.moveTo(startX, startY); ctx.lineTo(x, y); ctx.stroke(); }
+                }
                 return;
             }
             updateCursor(e);
@@ -357,11 +491,22 @@
         canvas.addEventListener('mouseup', (e) => {
             let stateChanged = false;
             if (isDrawing) {
-                const { x, y } = getMousePos(e);
-                let newObject = { type: currentTool, x: Math.min(startX, x), y: Math.min(startY, y), width: Math.abs(x - startX), height: Math.abs(y - startY), color: colorPicker.value, opacity: parseFloat(opacitySlider.value), lineWidth: lineWidthInput.value, fontSize: fontSizeInput.value };
-                if (currentTool === 'line') newObject = { ...newObject, x: startX, y: startY, width: x - startX, height: y - startY };
-                if ((newObject.width > 5 || newObject.height > 5 || currentTool === 'line') && (newObject.width !== 0 || newObject.height !== 0)) {
-                    objects.push(newObject);
+                let currentObjectIsFinalized = false;
+                if (currentTool === 'pencil') {
+                    const currentPath = objects[objects.length - 1];
+                    if (currentPath.points.length < 2) { objects.pop(); } 
+                    else { currentObjectIsFinalized = true; }
+                } else { // rect, line
+                    const { x, y } = getMousePos(e);
+                    let newObject = { type: currentTool, x: Math.min(startX, x), y: Math.min(startY, y), width: Math.abs(x - startX), height: Math.abs(y - startY), color: colorPicker.value, opacity: parseFloat(opacitySlider.value), lineWidth: lineWidthInput.value, fontSize: fontSizeInput.value };
+                    if (currentTool === 'line') newObject = { ...newObject, x: startX, y: startY, width: x - startX, height: y - startY };
+                    if ((newObject.width > 2 || newObject.height > 2 || currentTool === 'line') && (newObject.width !== 0 || newObject.height !== 0)) {
+                        objects.push(newObject);
+                        currentObjectIsFinalized = true;
+                    }
+                }
+
+                if (currentObjectIsFinalized) {
                     stateChanged = true;
                     if (!continuousDrawingCheckbox.checked) {
                         document.querySelector('.tool-btn[data-tool="select"]').click();
@@ -397,6 +542,21 @@
             link.click();
         });
         
+        copyBtn.addEventListener('click', async () => {
+            selectedObject = null;
+            redrawCanvas();
+            try {
+                const blob = await new Promise(resolve => canvas.toBlob(resolve, 'image/png'));
+                await navigator.clipboard.write([ new ClipboardItem({ 'image/png': blob }) ]);
+                showToast('圖片已成功複製到剪貼簿！');
+            } catch (err) {
+                console.error('直接複製失敗，啟用備用方案:', err);
+                const dataUrl = canvas.toDataURL('image/png');
+                copyModalImg.src = dataUrl;
+                copyModal.classList.add('show');
+            }
+        });
+
         deleteBtn.addEventListener('click', () => {
             if (selectedObject) {
                 objects = objects.filter(obj => obj !== selectedObject);
@@ -413,8 +573,39 @@
             if (e.ctrlKey && e.key === 'z') { e.preventDefault(); undo(); }
             if (e.ctrlKey && e.key === 'y') { e.preventDefault(); redo(); }
         });
+        
+        modalCloseBtn.addEventListener('click', () => copyModal.classList.remove('show'));
+        copyModal.addEventListener('click', (e) => {
+            if (e.target === copyModal) {
+                copyModal.classList.remove('show');
+            }
+        });
 
         // --- 輔助函式 ---
+        // NEW: Centralized function to handle image loading
+        function handleImageFile(file, isPasted = false) {
+            if (isPasted) {
+                originalFilename = '剪貼簿圖片';
+            } else {
+                originalFilename = file.name.split('.').slice(0, -1).join('.');
+            }
+            downloadNameInput.value = `${originalFilename}_繪製版`;
+            
+            const reader = new FileReader();
+            reader.onload = (event) => {
+                backgroundImage = new Image();
+                backgroundImage.onload = () => {
+                    canvas.width = backgroundImage.width;
+                    canvas.height = backgroundImage.height;
+                    objects = []; // Clear objects when a new image is loaded
+                    redrawCanvas();
+                    saveState();
+                };
+                backgroundImage.src = event.target.result;
+            };
+            reader.readAsDataURL(file);
+        }
+
         function createOnCanvasInput(x, y, text = '', color, fontSize, opacity) {
             if (tempInput) tempInput.blur();
             const rect = canvas.getBoundingClientRect(); const scaleY = rect.height / canvas.height; const scaleX = rect.width / canvas.width;
@@ -495,10 +686,35 @@
                 canvas.style.cursor = 'default';
             }
         }
+        
+        function showToast(message) {
+            const toast = document.createElement('div');
+            toast.className = 'toast';
+            toast.textContent = message;
+            document.body.appendChild(toast);
+            setTimeout(() => {
+                toast.classList.add('show');
+            }, 10);
+            setTimeout(() => {
+                toast.classList.remove('show');
+                toast.addEventListener('transitionend', () => toast.remove());
+            }, 2500);
+        }
 
         // --- Scaling and Selection Functions ---
         function getObjectBounds(obj) {
-            if (obj.type === 'text') {
+            if (obj.type === 'pencil') {
+                if (!obj.points || obj.points.length === 0) return { x: 0, y: 0, width: 0, height: 0 };
+                let minX = obj.points[0].x, maxX = obj.points[0].x;
+                let minY = obj.points[0].y, maxY = obj.points[0].y;
+                for (let i = 1; i < obj.points.length; i++) {
+                    minX = Math.min(minX, obj.points[i].x);
+                    maxX = Math.max(maxX, obj.points[i].x);
+                    minY = Math.min(minY, obj.points[i].y);
+                    maxY = Math.max(maxY, obj.points[i].y);
+                }
+                return { x: minX, y: minY, width: maxX - minX, height: maxY - minY };
+            } else if (obj.type === 'text') {
                 ctx.font = `${obj.fontSize}px Arial`;
                 const lines = obj.text.split('\n'); let textWidth = 0;
                 lines.forEach(line => { const w = ctx.measureText(line).width; if (w > textWidth) textWidth = w; });
@@ -555,15 +771,29 @@
                 const scale = Math.abs(width) / originalWidth;
                 obj.fontSize = Math.max(5, orig.fontSize * scale);
                 obj.x = x; obj.y = y;
-            } else { obj.x = x; obj.y = y; obj.width = width; obj.height = height; }
+            } else if (obj.type === 'pencil') {
+                const originalBounds = getObjectBounds(orig);
+                if (originalBounds.width === 0 || originalBounds.height === 0) return;
+                const scaleX = width / originalBounds.width;
+                const scaleY = height / originalBounds.height;
+                obj.points = orig.points.map(p => ({
+                    x: x + (p.x - originalBounds.x) * scaleX,
+                    y: y + (p.y - originalBounds.y) * scaleY
+                }));
+            } else { // Rectangle
+                obj.x = x; obj.y = y; obj.width = width; obj.height = height;
+            }
         }
         function getObjectAtPosition(x, y) {
             for (let i = objects.length - 1; i >= 0; i--) {
-                const obj = objects[i]; const bounds = getObjectBounds(obj);
-                if (obj.type === 'line') {
-                    const dist = distToSegment({x, y}, {x: obj.x, y: obj.y}, {x: obj.x + obj.width, y: obj.y + obj.height});
-                    if (dist < Math.max(10, obj.lineWidth / 2)) return obj;
+                const obj = objects[i];
+                if (obj.type === 'pencil') {
+                    for (let j = 0; j < obj.points.length - 1; j++) {
+                        const dist = distToSegment({x, y}, obj.points[j], obj.points[j+1]);
+                        if (dist < Math.max(10, obj.lineWidth / 2)) return obj;
+                    }
                 } else {
+                    const bounds = getObjectBounds(obj);
                     if (x >= bounds.x && x <= bounds.x + bounds.width && y >= bounds.y && y <= bounds.y + bounds.height) return obj;
                 }
             }
