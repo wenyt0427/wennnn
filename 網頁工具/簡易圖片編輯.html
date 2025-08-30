@@ -23,12 +23,38 @@
             margin: 0;
             padding: 20px;
             color: var(--dark-gray);
+            padding-top: 0; /* REMOVED: top padding to allow full canvas view */
         }
 
         h1 {
             color: var(--dark-gray);
-            margin-bottom: 25px;
+            margin-bottom: 10px; /* MODIFIED */
+            font-size: 1.25rem; /* MODIFIED */
         }
+        
+        /* NEW: Top Bar Container for auto-hiding */
+        #top-bar-container {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            z-index: 1000;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 5px 0; /* MODIFIED */
+            background: linear-gradient(to bottom, rgba(248, 249, 250, 1) 70%, rgba(248, 249, 250, 0));
+            transform: translateY(-100%);
+            transition: transform 0.4s ease-in-out;
+            pointer-events: none; /* Allow clicks through the container padding */
+        }
+        #top-bar-container.show {
+            transform: translateY(0);
+        }
+        #top-bar-container > * {
+            pointer-events: auto; /* Re-enable clicks for h1 and toolbar */
+        }
+
 
         /* 工具列樣式 */
         #toolbar {
@@ -36,12 +62,11 @@
             max-width: 1200px;
             background: rgba(255, 255, 255, 0.9);
             backdrop-filter: blur(10px);
-            padding: 1rem 1.5rem;
+            padding: 0.4rem 0.8rem; /* MODIFIED */
             border-radius: 1rem;
             box-shadow: var(--shadow);
-            margin-bottom: 2rem;
             display: flex;
-            gap: 1.5rem;
+            gap: 0.8rem; /* MODIFIED */
             align-items: center;
             flex-wrap: wrap;
             border: 1px solid rgba(255, 255, 255, 0.18);
@@ -50,8 +75,8 @@
         .tool-group {
             display: flex;
             align-items: center;
-            gap: 0.75rem;
-            padding: 0.5rem;
+            gap: 0.4rem; /* MODIFIED */
+            padding: 0 0.3rem; /* MODIFIED */
             border-right: 1px solid var(--border-color);
         }
         .tool-group:last-child {
@@ -60,19 +85,20 @@
 
         #toolbar label {
             font-weight: 500;
-            font-size: 0.9rem;
+            font-size: 0.75rem; /* MODIFIED */
             cursor: pointer;
+            user-select: none;
         }
 
         /* 按鈕樣式 */
         #toolbar button {
-            padding: 0.5rem 1rem;
+            padding: 0.3rem 0.6rem; /* MODIFIED */
             border: 1px solid var(--border-color);
             border-radius: 0.5rem;
             cursor: pointer;
             background-color: #fff;
             transition: all 0.2s ease;
-            font-size: 0.9rem;
+            font-size: 0.75rem; /* MODIFIED */
         }
 
         #toolbar button:hover {
@@ -97,24 +123,28 @@
         /* 輸入控制項樣式 */
         input[type="checkbox"] { cursor: pointer; }
         input[type="color"] {
-            width: 38px; height: 38px; border: none; border-radius: 8px; cursor: pointer; padding: 0;
+            width: 28px; height: 28px; /* MODIFIED */
+            border: none; border-radius: 8px; cursor: pointer; padding: 0;
         }
         input[type="range"] { cursor: pointer; }
-        input[type="number"] { width: 60px; padding: 0.5rem; border: 1px solid var(--border-color); border-radius: 0.5rem; }
-        input[type="text"] { width: 180px; padding: 0.5rem; border: 1px solid var(--border-color); border-radius: 0.5rem; }
-        input[type="file"] { border: 1px solid var(--border-color); padding: 0.5rem; border-radius: 0.5rem; font-size: 0.85rem; }
+        input[type="number"] { width: 45px; padding: 0.3rem; border: 1px solid var(--border-color); border-radius: 0.5rem; font-size: 0.75rem; } /* MODIFIED */
+        input[type="text"] { width: 120px; padding: 0.3rem; border: 1px solid var(--border-color); border-radius: 0.5rem; font-size: 0.75rem; } /* MODIFIED */
+        input[type="file"] { border: 1px solid var(--border-color); padding: 0.3rem; border-radius: 0.5rem; font-size: 0.75rem; } /* MODIFIED */
         
         /* 畫布容器 */
         #canvas-container {
+            margin-top: 20px; /* Add some space from the top initially */
             border: 1px solid var(--border-color);
             padding: 0.5rem;
             border-radius: 1rem;
             background-color: #ffffff;
             box-shadow: var(--shadow);
             position: relative;
+            overflow: hidden; /* Hide anything drawn outside canvas bounds */
         }
         
         canvas { display: block; max-width: 100%; height: auto; }
+        canvas.hide-cursor { cursor: none; }
 
         /* 畫布上文字輸入 */
         .on-canvas-input {
@@ -132,7 +162,7 @@
             color: #fff;
             padding: 10px 20px;
             border-radius: 20px;
-            z-index: 1000;
+            z-index: 2100; /* Higher than modal */
             opacity: 0;
             transition: opacity 0.3s ease, bottom 0.3s ease;
             pointer-events: none;
@@ -191,65 +221,89 @@
             cursor: pointer;
             color: #888;
         }
+
+        /* Brush Cursor Preview */
+        #brush-cursor-preview {
+            position: absolute;
+            border-radius: 50%;
+            border: 1px solid rgba(0, 0, 0, 0.8);
+            background-color: rgba(255, 255, 255, 0.5);
+            pointer-events: none;
+            display: none;
+            z-index: 9999;
+            transform: translate(-50%, -50%);
+            box-sizing: border-box; /* ADDED: To make size more accurate */
+        }
+        
+        #top-trigger-zone {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 20px;
+            z-index: 1001;
+        }
     </style>
 </head>
 <body>
+    <div id="top-trigger-zone"></div>
+    <div id="top-bar-container">
+        <h1>✨ Wennnn線上圖片編輯器 ✨</h1>
+        <div id="toolbar">
+            <div class="tool-group">
+                <input type="file" id="uploader" accept="image/*">
+            </div>
 
-    <h1>✨ Wennnn線上圖片編輯器 ✨</h1>
+            <div class="tool-group">
+                <label>工具:</label>
+                <button class="tool-btn active" data-tool="select" title="移動/選取/縮放">🖐️</button>
+                <button class="tool-btn" data-tool="rect" title="矩形">▭</button>
+                <button class="tool-btn" data-tool="line" title="線條">∕</button>
+                <button class="tool-btn" data-tool="pencil" title="畫筆">✏️</button>
+                <button class="tool-btn" data-tool="text" title="文字">T</button>
+                <button class="tool-btn" data-tool="eyedropper" title="滴管">💧</button>
+            </div>
 
-    <div id="toolbar">
-        <div class="tool-group">
-            <input type="file" id="uploader" accept="image/*">
-        </div>
+            <div class="tool-group">
+                <input type="checkbox" id="continuous-drawing-checkbox" title="連續繪製相同圖形">
+                <label for="continuous-drawing-checkbox">連續繪製</label>
+            </div>
 
-        <div class="tool-group">
-            <label>工具:</label>
-            <button class="tool-btn active" data-tool="select" title="移動/選取/縮放">🖐️</button>
-            <button class="tool-btn" data-tool="rect" title="矩形">▭</button>
-            <button class="tool-btn" data-tool="line" title="線條">∕</button>
-            <button class="tool-btn" data-tool="pencil" title="畫筆">✏️</button>
-            <button class="tool-btn" data-tool="text" title="文字">T</button>
-            <button class="tool-btn" data-tool="eyedropper" title="滴管">💧</button>
-        </div>
+            <div class="tool-group">
+                <label for="color-picker">顏色:</label>
+                <input type="color" id="color-picker" value="#E74C3C">
+                <label for="opacity-slider">透明度:</label>
+                <input type="range" id="opacity-slider" min="0" max="1" step="0.01" value="1">
+                <span id="opacity-value">1.0</span>
+            </div>
 
-        <div class="tool-group">
-            <input type="checkbox" id="continuous-drawing-checkbox" title="連續繪製相同圖形">
-            <label for="continuous-drawing-checkbox">連續繪製</label>
-        </div>
+            <div class="tool-group">
+                <label for="line-width">線條/筆觸:</label>
+                <input type="range" id="line-width" min="1" max="100" value="5">
+                <span id="line-width-value">5</span>
+            </div>
+            
+            <div class="tool-group">
+                <label for="font-size">文字:</label>
+                <input type="range" id="font-size" min="10" max="200" value="30">
+                <input type="number" id="font-size-input" min="10" max="200" value="30">
+            </div>
+            
+            <div class="tool-group">
+                <label>歷史:</label>
+                <button id="undo-btn" title="復原 (Ctrl+Z)">↩️</button>
+                <button id="redo-btn" title="重做 (Ctrl+Y)">↪️</button>
+            </div>
 
-        <div class="tool-group">
-            <label for="color-picker">顏色:</label>
-            <input type="color" id="color-picker" value="#E74C3C">
-            <label for="opacity-slider">透明度:</label>
-            <input type="range" id="opacity-slider" min="0" max="1" step="0.01" value="1">
-            <span id="opacity-value">1.0</span>
-        </div>
-
-        <div class="tool-group">
-            <label for="line-width">線條/筆觸:</label>
-            <input type="range" id="line-width" min="1" max="100" value="5">
-            <span id="line-width-value">5</span>
-        </div>
-        
-        <div class="tool-group">
-            <label for="font-size">文字:</label>
-            <input type="range" id="font-size" min="10" max="200" value="30">
-            <input type="number" id="font-size-input" min="10" max="200" value="30">
-        </div>
-        
-        <div class="tool-group">
-            <label>歷史:</label>
-            <button id="undo-btn" title="復原 (Ctrl+Z)">↩️</button>
-            <button id="redo-btn" title="重做 (Ctrl+Y)">↪️</button>
-        </div>
-
-        <div class="tool-group">
-            <button id="delete-btn" title="刪除選取">🗑️</button>
-            <input type="text" id="download-name-input" title="下載檔名" value="edited-image">
-            <button id="download-btn" style="background-color: #28a745; color: white;">下載圖片</button>
-            <button id="copy-btn" title="複製圖片到剪貼簿">📋 複製</button>
+            <div class="tool-group">
+                <button id="delete-btn" title="刪除選取">🗑️</button>
+                <input type="text" id="download-name-input" title="下載檔名" value="edited-image">
+                <button id="download-btn" style="background-color: #28a745; color: white;">下載圖片</button>
+                <button id="copy-btn" title="複製圖片到剪貼簿">📋 複製</button>
+            </div>
         </div>
     </div>
+
 
     <div id="canvas-container">
         <canvas id="canvas" width="800" height="600"></canvas>
@@ -263,12 +317,16 @@
             <img id="copy-modal-img" src="" alt="預覽圖片">
         </div>
     </div>
+    
+    <div id="brush-cursor-preview"></div>
 
     <script>
         const canvas = document.getElementById('canvas');
         const ctx = canvas.getContext('2d');
-
+        
         // --- DOM 元素 ---
+        const topBarContainer = document.getElementById('top-bar-container'); 
+        const topTriggerZone = document.getElementById('top-trigger-zone');
         const uploader = document.getElementById('uploader');
         const colorPicker = document.getElementById('color-picker');
         const opacitySlider = document.getElementById('opacity-slider');
@@ -288,6 +346,7 @@
         const copyModal = document.getElementById('copy-modal');
         const copyModalImg = document.getElementById('copy-modal-img');
         const modalCloseBtn = document.getElementById('modal-close-btn');
+        const brushCursorPreview = document.getElementById('brush-cursor-preview');
         
         // --- 應用程式狀態變數 ---
         let objects = [];
@@ -302,6 +361,7 @@
         let resizingHandle = null;
         const handleSize = 8;
         let originalObjectProps = {};
+        let hideTopBarTimeout;
 
         // --- History (Undo/Redo) ---
         let history = [];
@@ -312,10 +372,8 @@
             ctx.clearRect(0, 0, canvas.width, canvas.height);
             ctx.fillStyle = "#ffffff";
             ctx.fillRect(0, 0, canvas.width, canvas.height);
-            if (backgroundImage) ctx.drawImage(backgroundImage, 0, 0, canvas.width, canvas.height);
-
+            if (backgroundImage) ctx.drawImage(backgroundImage, 0, 0);
             objects.forEach(drawObject);
-
             if (selectedObject) {
                 drawSelection(selectedObject);
             }
@@ -386,19 +444,23 @@
             }
         });
 
-        toolBtns.forEach(btn => btn.addEventListener('click', () => {
-            const newTool = btn.dataset.tool;
+        function selectTool(toolName) {
             if (currentTool !== 'eyedropper') {
                 previousTool = currentTool;
             }
-            toolBtns.forEach(b => b.classList.remove('active'));
-            btn.classList.add('active');
-            currentTool = newTool;
+            currentTool = toolName;
+
+            toolBtns.forEach(btn => {
+                btn.classList.toggle('active', btn.dataset.tool === toolName);
+            });
+            
             updateCursor();
             selectedObject = null;
             if (tempInput) tempInput.blur();
             redrawCanvas();
-        }));
+        }
+
+        toolBtns.forEach(btn => btn.addEventListener('click', () => selectTool(btn.dataset.tool)));
         
         const syncFontSize = (value) => {
             fontSizeInput.value = value; fontSizeNumInput.value = value;
@@ -412,11 +474,18 @@
         lineWidthInput.addEventListener('input', (e) => {
             lineWidthValue.textContent = e.target.value;
             if (selectedObject && ['rect', 'line', 'pencil'].includes(selectedObject.type)) {
-                selectedObject.lineWidth = e.target.value; redrawCanvas();
+                selectedObject.lineWidth = e.target.value;
+                redrawCanvas();
+            }
+            if (['pencil', 'rect', 'line'].includes(currentTool)) {
+                updateBrushCursor();
             }
         });
         lineWidthInput.addEventListener('change', saveState);
 
+        colorPicker.addEventListener('input', () => {
+             if (['pencil', 'rect', 'line'].includes(currentTool)) updateBrushCursor();
+        });
         colorPicker.addEventListener('change', (e) => {
             if (selectedObject) {
                 selectedObject.color = e.target.value; redrawCanvas(); saveState();
@@ -430,11 +499,13 @@
                 selectedObject.opacity = value;
                 redrawCanvas();
             }
+            if (['pencil', 'rect', 'line'].includes(currentTool)) updateBrushCursor();
         });
         opacitySlider.addEventListener('change', saveState);
 
         canvas.addEventListener('mousedown', (e) => {
             if (tempInput) { tempInput.blur(); return; }
+            
             const { x, y } = getMousePos(e); startX = x; startY = y;
             
             if (currentTool === 'eyedropper') {
@@ -459,10 +530,12 @@
                 createOnCanvasInput(x, y);
             } else if (currentTool === 'pencil') {
                  isDrawing = true;
+                 topBarContainer.classList.remove('show');
                 const newObject = { type: 'pencil', points: [{ x, y }], color: colorPicker.value, opacity: parseFloat(opacitySlider.value), lineWidth: lineWidthInput.value };
                 objects.push(newObject);
             } else { // rect, line
                 isDrawing = true;
+                topBarContainer.classList.remove('show');
             }
             redrawCanvas();
         });
@@ -483,11 +556,25 @@
                 return;
             }
             if (isDrawing) {
+                redrawCanvas(); 
                 if (currentTool === 'pencil') {
                     const currentPath = objects[objects.length - 1];
                     currentPath.points.push({ x, y });
+                    drawObject(currentPath);
+                } else {
+                    const previewColor = hexToRgba(colorPicker.value, 0.7);
+                    ctx.strokeStyle = previewColor;
+                    ctx.lineWidth = lineWidthInput.value;
+                    if (currentTool === 'rect') {
+                        ctx.strokeRect(startX, startY, x - startX, y - startY);
+                    } else if (currentTool === 'line') {
+                        ctx.beginPath();
+                        ctx.moveTo(startX, startY);
+                        ctx.lineTo(x, y);
+                        ctx.stroke();
+                    }
                 }
-                redrawCanvas();
+                return;
             }
             updateCursor(e);
         });
@@ -512,8 +599,8 @@
 
                 if (currentObjectIsFinalized) {
                     stateChanged = true;
-                    if (!continuousDrawingCheckbox.checked) {
-                        document.querySelector(`.tool-btn[data-tool="select"]`).click();
+                    if (!continuousDrawingCheckbox.checked && currentTool !== 'pencil') {
+                        selectTool('select');
                     }
                 }
             }
@@ -587,6 +674,38 @@
         modalCloseBtn.addEventListener('click', () => copyModal.classList.remove('show'));
         copyModal.addEventListener('click', (e) => { if (e.target === copyModal) copyModal.classList.remove('show'); });
 
+        // UPDATED: Auto-hide top toolbar logic
+        let isHoveringTopBar = false;
+        topTriggerZone.addEventListener('mouseenter', () => {
+            topBarContainer.classList.add('show');
+        });
+
+        topBarContainer.addEventListener('mouseenter', () => {
+            isHoveringTopBar = true;
+        });
+
+        document.addEventListener('mousemove', (e) => {
+            if (e.clientY > topBarContainer.offsetHeight && isHoveringTopBar) {
+                isHoveringTopBar = false;
+                topBarContainer.classList.remove('show');
+            }
+        });
+
+
+        // --- Brush Cursor Listeners ---
+        canvas.addEventListener('mouseenter', () => {
+            if (['pencil', 'rect', 'line'].includes(currentTool)) {
+                brushCursorPreview.style.display = 'block';
+            }
+        });
+        canvas.addEventListener('mouseleave', () => {
+            brushCursorPreview.style.display = 'none';
+        });
+        document.addEventListener('mousemove', (e) => {
+            brushCursorPreview.style.left = `${e.clientX + window.scrollX}px`;
+            brushCursorPreview.style.top = `${e.clientY + window.scrollY}px`;
+        });
+
         // --- 輔助函式 ---
         function handleImageFile(file, isPasted = false) {
             if (isPasted) originalFilename = '剪貼簿圖片';
@@ -609,7 +728,7 @@
 
         function createOnCanvasInput(x, y, text = '', color, fontSize, opacity) {
             if (tempInput) tempInput.blur();
-            const rect = canvas.getBoundingClientRect(); const scaleY = rect.height / canvas.height; const scaleX = rect.width / canvas.width;
+            const rect = canvas.getBoundingClientRect(); 
             color = color || colorPicker.value;
             fontSize = fontSize || fontSizeInput.value;
             opacity = opacity !== undefined ? opacity : parseFloat(opacitySlider.value);
@@ -617,8 +736,12 @@
             tempInput = document.createElement('textarea'); tempInput.value = text; tempInput.className = 'on-canvas-input';
             document.body.appendChild(tempInput);
             Object.assign(tempInput.style, {
-                position: 'absolute', left: `${rect.left + window.scrollX + (x * scaleX)}px`, top: `${rect.top + window.scrollY + (y * scaleY)}px`,
-                color: color, fontSize: `${fontSize * scaleY}px`, fontFamily: 'Arial', lineHeight: '1.1'
+                position: 'absolute', 
+                left: `${rect.left + window.scrollX + x}px`, 
+                top: `${rect.top + window.scrollY + y}px`,
+                color: color, 
+                fontSize: `${fontSize}px`, 
+                fontFamily: 'Arial', lineHeight: '1.1'
             });
             setTimeout(() => tempInput.focus(), 0);
             const autoResize = () => { if (!tempInput) return; tempInput.style.height = 'auto'; tempInput.style.width = 'auto'; tempInput.style.height = tempInput.scrollHeight + 'px'; tempInput.style.width = tempInput.scrollWidth + 'px'; };
@@ -627,11 +750,11 @@
                 if (!tempInput) return;
                 const newText = tempInput.value; 
                 if (newText) {
-                    objects.push({ type: 'text', text: newText, x, y, color: color, opacity: opacity, fontSize: fontSize });
+                    objects.push({ type: 'text', text: newText, x: x, y: y, color: color, opacity: opacity, fontSize: fontSize });
                 }
                 document.body.removeChild(tempInput); 
                 tempInput = null; 
-                if (!continuousDrawingCheckbox.checked) document.querySelector('.tool-btn[data-tool="select"]').click();
+                if (!continuousDrawingCheckbox.checked) selectTool('select');
                 else redrawCanvas();
                 saveState();
             };
@@ -651,8 +774,13 @@
         }
 
         function getMousePos(evt) {
-            const rect = canvas.getBoundingClientRect(); const scaleX = canvas.width / rect.width; const scaleY = canvas.height / rect.height;
-            return { x: (evt.clientX - rect.left) * scaleX, y: (evt.clientY - rect.top) * scaleY };
+            const rect = canvas.getBoundingClientRect(); 
+            const scaleX = canvas.width / rect.width; 
+            const scaleY = canvas.height / rect.height;
+            return {
+                x: (evt.clientX - rect.left) * scaleX,
+                y: (evt.clientY - rect.top) * scaleY
+            };
         }
         
         function pickColor(x, y) {
@@ -663,7 +791,7 @@
             opacitySlider.value = alpha;
             opacityValue.textContent = alpha;
             showToast(`已選取顏色: ${hex}`);
-            document.querySelector(`.tool-btn[data-tool="${previousTool}"]`).click();
+            selectTool(previousTool);
         }
 
         function updateToolbarForSelection(obj) {
@@ -674,12 +802,60 @@
             else { lineWidthInput.value = obj.lineWidth; lineWidthValue.textContent = obj.lineWidth; }
         }
         
-        function updateCursor() {
-            if (currentTool === 'eyedropper') canvas.style.cursor = 'copy';
-            else if (currentTool !== 'select') canvas.style.cursor = 'crosshair';
-            else canvas.style.cursor = 'default';
+        function updateCursor(e) {
+            const isDrawingTool = ['pencil', 'rect', 'line'].includes(currentTool);
+            canvas.classList.toggle('hide-cursor', isDrawingTool);
+
+            if (isDrawingTool) {
+                updateBrushCursor();
+                if(e) { 
+                    brushCursorPreview.style.display = 'block';
+                }
+            } else {
+                brushCursorPreview.style.display = 'none';
+                if (currentTool === 'eyedropper') canvas.style.cursor = 'copy';
+                else if (currentTool !== 'select') canvas.style.cursor = 'crosshair';
+                else { 
+                    if (e) {
+                        const { x, y } = getMousePos(e);
+                        const handle = getHandleAtPosition(x, y);
+                        if (handle) {
+                            if (selectedObject && selectedObject.type === 'line') { canvas.style.cursor = 'pointer'; } 
+                            else {
+                                if (handle.includes('n') || handle.includes('s')) canvas.style.cursor = 'ns-resize';
+                                else if (handle.includes('w') || handle.includes('e')) canvas.style.cursor = 'ew-resize';
+                                else if ((handle.startsWith('n') && handle.endsWith('w')) || (handle.startsWith('s') && handle.endsWith('e'))) canvas.style.cursor = 'nwse-resize';
+                                else canvas.style.cursor = 'nesw-resize';
+                            }
+                        } else if (getObjectAtPosition(x, y)) {
+                            canvas.style.cursor = 'move';
+                        } else {
+                            canvas.style.cursor = 'default';
+                        }
+                    } else {
+                         canvas.style.cursor = 'default';
+                    }
+                }
+            }
         }
         
+        function updateBrushCursor() {
+            if (!['pencil', 'rect', 'line'].includes(currentTool)) return;
+            const rect = canvas.getBoundingClientRect();
+            if (rect.width === 0) return;
+            
+            const scale = canvas.width / rect.width;
+            
+            const size = lineWidthInput.value / scale;
+
+            brushCursorPreview.style.width = `${size}px`;
+            brushCursorPreview.style.height = `${size}px`;
+            
+            const colorWithOpacity = hexToRgba(colorPicker.value, 0.5);
+            brushCursorPreview.style.backgroundColor = colorWithOpacity;
+            brushCursorPreview.style.borderColor = colorPicker.value;
+        }
+
         function showToast(message) {
             const toast = document.createElement('div');
             toast.className = 'toast';
@@ -725,7 +901,8 @@
             const handles = getHandles(obj);
             ctx.fillStyle = '#fff'; ctx.strokeStyle = '#007bff'; ctx.lineWidth = 1;
             for (const key in handles) {
-                const h = handles[key]; ctx.beginPath();
+                const h = handles[key]; 
+                ctx.beginPath();
                 ctx.rect(h.x - handleSize / 2, h.y - handleSize / 2, handleSize, handleSize);
                 ctx.fill(); ctx.stroke();
             }
