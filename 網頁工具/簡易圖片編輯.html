@@ -268,6 +268,11 @@
                 <input type="checkbox" id="continuous-drawing-checkbox" title="連續繪製相同圖形">
                 <label for="continuous-drawing-checkbox">連續繪製</label>
             </div>
+            
+            <div class="tool-group">
+                <input type="checkbox" id="auto-copy-checkbox" title="完成編輯後自動複製到剪貼簿">
+                <label for="auto-copy-checkbox">自動複製</label>
+            </div>
 
             <div class="tool-group">
                 <label for="color-picker">顏色:</label>
@@ -342,6 +347,7 @@
         const undoBtn = document.getElementById('undo-btn');
         const redoBtn = document.getElementById('redo-btn');
         const continuousDrawingCheckbox = document.getElementById('continuous-drawing-checkbox');
+        const autoCopyCheckbox = document.getElementById('auto-copy-checkbox');
         const copyBtn = document.getElementById('copy-btn');
         const copyModal = document.getElementById('copy-modal');
         const copyModalImg = document.getElementById('copy-modal-img');
