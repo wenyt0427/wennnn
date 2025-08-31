@@ -713,7 +713,7 @@
             link.click();
         });
         
-        copyBtn.addEventListener('click', () => copyCanvasToClipboard(false));
+        copyBtn.addEventListener('click', copyCanvasToClipboard);
 
         function deleteSelectedObject() {
             if (selectedObjects.length > 0) {
@@ -780,22 +780,18 @@
         });
 
         // --- 輔助函式 ---
-        async function copyCanvasToClipboard(isAuto = false) {
+        async function copyCanvasToClipboard() {
             selectedObjects = [];
             redrawCanvas();
             try {
                 const blob = await new Promise(resolve => canvas.toBlob(resolve, 'image/png'));
                 await navigator.clipboard.write([ new ClipboardItem({ 'image/png': blob }) ]);
-                showToast(isAuto ? '已自動複製到剪貼簿！' : '圖片已成功複製到剪貼簿！');
+                showToast('圖片已成功複製到剪貼簿！');
             } catch (err) {
                 console.error('複製失敗:', err);
-                if (isAuto) {
-                    showToast('自動複製失敗，瀏覽器可能需要權限。');
-                } else {
-                    const dataUrl = canvas.toDataURL('image/png');
-                    copyModalImg.src = dataUrl;
-                    copyModal.classList.add('show');
-                }
+                const dataUrl = canvas.toDataURL('image/png');
+                copyModalImg.src = dataUrl;
+                copyModal.classList.add('show');
             }
         }
 
@@ -1082,14 +1078,11 @@
         }
 
         // --- History Functions ---
-        function saveState(shouldAutoCopy = true) {
+        function saveState() {
             history.length = historyIndex + 1;
             history.push(JSON.parse(JSON.stringify(objects)));
             historyIndex++;
             updateHistoryButtons();
-            if (shouldAutoCopy) {
-                copyCanvasToClipboard(true);
-            }
         }
         function undo() {
             if (historyIndex > 0) {
@@ -1098,7 +1091,6 @@
                 selectedObjects = [];
                 redrawCanvas();
                 updateHistoryButtons();
-                copyCanvasToClipboard(true);
             }
         }
         function redo() {
@@ -1108,7 +1100,6 @@
                 selectedObjects = [];
                 redrawCanvas();
                 updateHistoryButtons();
-                copyCanvasToClipboard(true);
             }
         }
         function updateHistoryButtons() {
@@ -1117,7 +1108,7 @@
         }
         
         // Initial state
-        saveState(false);
+        saveState();
         redrawCanvas();
     </script>
 </body>
