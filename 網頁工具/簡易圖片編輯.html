@@ -268,11 +268,6 @@
                 <input type="checkbox" id="continuous-drawing-checkbox" title="連續繪製相同圖形">
                 <label for="continuous-drawing-checkbox">連續繪製</label>
             </div>
-            
-            <div class="tool-group">
-                <input type="checkbox" id="auto-copy-checkbox" title="完成編輯後自動複製到剪貼簿">
-                <label for="auto-copy-checkbox">自動複製</label>
-            </div>
 
             <div class="tool-group">
                 <label for="color-picker">顏色:</label>
@@ -347,7 +342,6 @@
         const undoBtn = document.getElementById('undo-btn');
         const redoBtn = document.getElementById('redo-btn');
         const continuousDrawingCheckbox = document.getElementById('continuous-drawing-checkbox');
-        const autoCopyCheckbox = document.getElementById('auto-copy-checkbox');
         const copyBtn = document.getElementById('copy-btn');
         const copyModal = document.getElementById('copy-modal');
         const copyModalImg = document.getElementById('copy-modal-img');
@@ -719,20 +713,7 @@
             link.click();
         });
         
-        copyBtn.addEventListener('click', async () => {
-            selectedObjects = [];
-            redrawCanvas();
-            try {
-                const blob = await new Promise(resolve => canvas.toBlob(resolve, 'image/png'));
-                await navigator.clipboard.write([ new ClipboardItem({ 'image/png': blob }) ]);
-                showToast('圖片已成功複製到剪貼簿！');
-            } catch (err) {
-                console.error('直接複製失敗，啟用備用方案:', err);
-                const dataUrl = canvas.toDataURL('image/png');
-                copyModalImg.src = dataUrl;
-                copyModal.classList.add('show');
-            }
-        });
+        copyBtn.addEventListener('click', () => copyCanvasToClipboard(false));
 
         function deleteSelectedObject() {
             if (selectedObjects.length > 0) {
@@ -799,6 +780,25 @@
         });
 
         // --- 輔助函式 ---
+        async function copyCanvasToClipboard(isAuto = false) {
+            selectedObjects = [];
+            redrawCanvas();
+            try {
+                const blob = await new Promise(resolve => canvas.toBlob(resolve, 'image/png'));
+                await navigator.clipboard.write([ new ClipboardItem({ 'image/png': blob }) ]);
+                showToast(isAuto ? '已自動複製到剪貼簿！' : '圖片已成功複製到剪貼簿！');
+            } catch (err) {
+                console.error('複製失敗:', err);
+                if (isAuto) {
+                    showToast('自動複製失敗，瀏覽器可能需要權限。');
+                } else {
+                    const dataUrl = canvas.toDataURL('image/png');
+                    copyModalImg.src = dataUrl;
+                    copyModal.classList.add('show');
+                }
+            }
+        }
+
         function handleImageFile(file, isPasted = false) {
             if (isPasted) originalFilename = '剪貼簿圖片';
             else originalFilename = file.name.split('.').slice(0, -1).join('.');
@@ -1082,11 +1082,14 @@
         }
 
         // --- History Functions ---
-        function saveState() {
+        function saveState(shouldAutoCopy = true) {
             history.length = historyIndex + 1;
             history.push(JSON.parse(JSON.stringify(objects)));
             historyIndex++;
             updateHistoryButtons();
+            if (shouldAutoCopy) {
+                copyCanvasToClipboard(true);
+            }
         }
         function undo() {
             if (historyIndex > 0) {
@@ -1095,6 +1098,7 @@
                 selectedObjects = [];
                 redrawCanvas();
                 updateHistoryButtons();
+                copyCanvasToClipboard(true);
             }
         }
         function redo() {
@@ -1104,6 +1108,7 @@
                 selectedObjects = [];
                 redrawCanvas();
                 updateHistoryButtons();
+                copyCanvasToClipboard(true);
             }
         }
         function updateHistoryButtons() {
@@ -1112,7 +1117,7 @@
         }
         
         // Initial state
-        saveState();
+        saveState(false);
         redrawCanvas();
     </script>
 </body>
